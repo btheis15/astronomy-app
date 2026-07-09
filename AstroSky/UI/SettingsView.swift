@@ -71,7 +71,7 @@ struct SettingsView: View {
 
                 locationSection
 
-                Section("About") {
+                Section {
                     LabeledContent("Star catalog",
                                    value: appState.catalog.usesDeepCatalog
                                        ? "HYG database (\(appState.catalog.stars.count) stars)"
@@ -81,6 +81,10 @@ struct SettingsView: View {
                                    value: "\(appState.satelliteService.satellites.count)")
                     LabeledContent("Ephemeris", value: "Meeus / JPL approximations")
                     LabeledContent("Satellite propagator", value: "SGP4 (Vallado)")
+                } header: {
+                    Text("About")
+                } footer: {
+                    Text("Star data: Yale Bright Star Catalogue and the HYG database (CC BY-SA 4.0). Deep-sky: Messier, Caldwell & NGC. Ephemerides: Meeus / JPL. Satellite elements: Celestrak.")
                 }
             }
             .navigationTitle("Settings")

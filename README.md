@@ -58,9 +58,19 @@ All catalog positions are J2000.0; positions are precessed to date for display. 
 
 Out of the box the app embeds ~200 real bright stars (every constellation-figure star plus the brightest stars of both hemispheres). For a much deeper sky:
 
+**Easiest:** run the bundled script, which downloads the HYG database, trims it to the naked-eye stars (magnitude ≤ 6.5) and writes `AstroSky/hygdata.csv` for you:
+
+```
+bash Scripts/fetch_hyg.sh
+```
+
+Then rebuild — `HYGCatalogLoader` picks it up automatically and the sky fills with every naked-eye star. The magnitude slider in Settings controls how many are drawn.
+
+**Manual alternative:**
+
 1. Download `hygdata_v41.csv` from the [HYG database](https://github.com/astronexus/HYG-Database) (CC BY-SA 4.0).
 2. Rename it to **`hygdata.csv`** and drag it into the `AstroSky` folder in Xcode (check "AstroSky" target membership).
-3. Rebuild. `HYGCatalogLoader` picks it up automatically and the sky fills with every naked-eye star (magnitude ≤ 6.5). The magnitude slider in Settings controls how many are drawn.
+3. Rebuild.
 
 ## Architecture
 
