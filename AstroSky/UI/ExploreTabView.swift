@@ -6,6 +6,7 @@
 //  the worlds to learn about them.
 //
 
+import ARKit
 import SwiftUI
 
 struct ExploreTabView: View {
@@ -13,10 +14,14 @@ struct ExploreTabView: View {
     @State private var distanceMode: DistanceMode = .fit
     @State private var selected: ScaleBody?
     @State private var isPlaced = false
+    /// Height of the model above the placed surface, in meters.
+    @State private var heightMeters: Float = 0
+
+    private var isAR: Bool { ARWorldTrackingConfiguration.isSupported }
 
     var body: some View {
         ZStack {
-            ScaleARView(scene: scene, distanceMode: distanceMode,
+            ScaleARView(scene: scene, distanceMode: distanceMode, heightMeters: heightMeters,
                         onSelect: { selected = $0 },
                         onPlacementChange: { isPlaced = $0 })
                 .id(scene.id)   // rebuild cleanly when the scene changes
@@ -32,6 +37,9 @@ struct ExploreTabView: View {
                         .padding(10)
                         .background(.ultraThinMaterial, in: Capsule())
                         .padding(.bottom, 24)
+                } else if isAR {
+                    heightControl
+                        .padding(.bottom, 20)
                 }
             }
             .padding()
@@ -63,6 +71,19 @@ struct ExploreTabView: View {
             .pickerStyle(.segmented)
             .frame(width: 190)
         }
+    }
+
+    /// Raise the model off the floor so it's comfortable standing outdoors.
+    private var heightControl: some View {
+        HStack(spacing: 12) {
+            Image(systemName: "arrow.up.and.down")
+            Slider(value: $heightMeters, in: 0...1.8)
+            Text("\(heightMeters * 3.28084, specifier: "%.1f") ft")
+                .font(.caption.monospacedDigit())
+                .frame(width: 46, alignment: .trailing)
+        }
+        .padding(.horizontal, 16).padding(.vertical, 10)
+        .background(.ultraThinMaterial, in: Capsule())
     }
 }
 

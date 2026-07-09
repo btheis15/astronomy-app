@@ -529,6 +529,20 @@ enum SkySceneBuilder {
         }
     }
 
+    /// Bundled 2K texture file key for each planet's Sky-view marker.
+    static func planetTextureKey(_ planet: Planet) -> String {
+        switch planet {
+        case .mercury: "2k_mercury"
+        case .venus: "2k_venus_atmosphere"
+        case .earth: "2k_earth_daymap"
+        case .mars: "2k_mars"
+        case .jupiter: "2k_jupiter"
+        case .saturn: "2k_saturn"
+        case .uranus: "2k_uranus"
+        case .neptune: "2k_neptune"
+        }
+    }
+
     static func planetMarkerRadius(_ planet: Planet) -> Float {
         switch planet {
         case .venus, .jupiter: 1.15
@@ -547,11 +561,20 @@ enum SkySceneBuilder {
         root.name = "solarSystem"
         var markers: [String: Entity] = [:]
 
-        func addMarker(id: String, labelText: String, color: UIColor, radius: Float) {
+        func addMarker(id: String, labelText: String, color: UIColor, radius: Float, textureKey: String? = nil) {
             let holder = Entity()
             holder.name = id
-            let sphere = ModelEntity(mesh: .generateSphere(radius: radius),
-                                     materials: [UnlitMaterial(color: color)])
+            let material: Material
+            if let textureKey, let texture = ScaleModelTexture.texture(key: textureKey) {
+                var textured = UnlitMaterial(color: .white)
+                textured.color = .init(tint: .white, texture: .init(texture))
+                material = textured
+            } else {
+                material = UnlitMaterial(color: color)
+            }
+            let sphere = ModelEntity(mesh: .generateSphere(radius: radius), materials: [material])
+            // Show the map the right way up and turned toward the viewer.
+            sphere.orientation = simd_quatf(angle: .pi / 2, axis: SIMD3(1, 0, 0))
             holder.addChild(sphere)
             let label = makeLabel(text: labelText, color: color, size: 1.7)
             label.position = SIMD3(0, -radius - 1.7, 0)
@@ -561,16 +584,18 @@ enum SkySceneBuilder {
         }
 
         addMarker(id: "sun", labelText: "Sun",
-                  color: UIColor(red: 1.0, green: 0.93, blue: 0.55, alpha: 1), radius: 2.3)
+                  color: UIColor(red: 1.0, green: 0.93, blue: 0.55, alpha: 1), radius: 2.6, textureKey: "2k_sun")
         addMarker(id: "moon", labelText: "Moon",
-                  color: UIColor(white: 0.92, alpha: 1), radius: 2.1)
+                  color: UIColor(white: 0.92, alpha: 1), radius: 2.4, textureKey: "2k_moon")
         for planet in Planet.visible {
+            // Oversized so planets are easy to find in the sky.
             addMarker(id: "planet.\(planet.rawValue)", labelText: planet.name,
-                      color: planetColor(planet), radius: planetMarkerRadius(planet))
+                      color: planetColor(planet), radius: planetMarkerRadius(planet) * 2.4,
+                      textureKey: planetTextureKey(planet))
         }
         for body in MinorBodyEphemeris.bodies {
             addMarker(id: "minor.\(body.key)", labelText: body.name,
-                      color: UIColor(white: 0.78, alpha: 1), radius: 0.6)
+                      color: UIColor(white: 0.78, alpha: 1), radius: 0.9)
         }
         return (root, markers)
     }

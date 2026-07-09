@@ -12,8 +12,13 @@ import SwiftUI
 struct SkyTabView: View {
     @Environment(AppState.self) private var appState
     @State private var guide: GuideReadout?
-    @State private var preferManualMode = !ARWorldTrackingConfiguration.isSupported
     @State private var showSearch = false
+
+    /// Effective free-look mode: the user's persisted choice, forced on where
+    /// AR isn't available (e.g. Simulator).
+    private var manualMode: Bool {
+        appState.preferManualSky || !ARWorldTrackingConfiguration.isSupported
+    }
     @State private var showTimeControls = false
     @State private var renderer: SkyRenderer?
     @State private var capturedPhoto: CapturedPhoto?
@@ -22,10 +27,10 @@ struct SkyTabView: View {
     var body: some View {
         ZStack {
             SkyARViewContainer(appState: appState,
-                               preferManualMode: preferManualMode,
+                               preferManualMode: manualMode,
                                onGuideUpdate: { guide = $0 },
                                onRendererReady: { renderer = $0 })
-            .id(preferManualMode)   // rebuild the view when switching modes
+            .id(manualMode)   // rebuild the view when switching modes
             .ignoresSafeArea()
 
             hud
@@ -116,9 +121,11 @@ struct SkyTabView: View {
             hudButton(systemImage: "clock", label: "Time travel controls") {
                 showTimeControls.toggle()
             }
-            hudButton(systemImage: preferManualMode ? "arkit" : "hand.draw",
-                      label: preferManualMode ? "Switch to AR mode" : "Switch to manual look-around mode") {
-                preferManualMode.toggle()
+            if ARWorldTrackingConfiguration.isSupported {
+                hudButton(systemImage: manualMode ? "arkit" : "move.3d",
+                          label: manualMode ? "Switch to camera (AR) mode" : "Switch to free-look mode") {
+                    appState.preferManualSky.toggle()
+                }
             }
             hudButton(systemImage: isCapturing ? "camera.fill" : "camera", label: "Take photo") {
                 capturePhoto()

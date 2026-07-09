@@ -198,6 +198,13 @@ final class AppState {
         set { withMutation(keyPath: \.nightMode) { UserDefaults.standard.set(newValue, forKey: "nightMode") } }
     }
 
+    /// Free-look (non-AR) sky: a dark, drag-to-explore VR-style view with the
+    /// camera off. Easier to use indoors or under bright lights. Persisted.
+    var preferManualSky: Bool {
+        get { access(keyPath: \.preferManualSky); return defaults(bool: "preferManualSky", default: false) }
+        set { withMutation(keyPath: \.preferManualSky) { UserDefaults.standard.set(newValue, forKey: "preferManualSky") } }
+    }
+
     var showMeteorShowers: Bool {
         get { access(keyPath: \.showMeteorShowers); return defaults(bool: "showMeteorShowers", default: true) }
         set { withMutation(keyPath: \.showMeteorShowers) { UserDefaults.standard.set(newValue, forKey: "showMeteorShowers") } }

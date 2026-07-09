@@ -1,6 +1,9 @@
 {
   "sourceLanguage" : "en",
   "strings" : {
+    "%.1f ft" : {
+
+    },
     "%@ · %@" : {
       "localizations" : {
         "en" : {
@@ -861,6 +864,9 @@
           }
         }
       }
+    },
+    "Free-look mode" : {
+
     },
     "Great-circle overlays: the ecliptic (the Sun and planets' path), the celestial equator, and a right-ascension/declination grid." : {
       "localizations" : {
@@ -1773,6 +1779,9 @@
         }
       }
     },
+    "Sky view" : {
+
+    },
     "Solar System" : {
       "localizations" : {
         "es" : {
@@ -2071,6 +2080,9 @@
           }
         }
       }
+    },
+    "Turns off the camera for a dark, drag-to-explore sky — easier to find objects indoors or under bright lights. You can also toggle this from the sky's mode button." : {
+
     },
     "Up" : {
       "localizations" : {

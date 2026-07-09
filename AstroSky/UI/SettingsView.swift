@@ -64,6 +64,14 @@ struct SettingsView: View {
                 }
 
                 Section {
+                    Toggle("Free-look mode", isOn: $appState.preferManualSky)
+                } header: {
+                    Text("Sky view")
+                } footer: {
+                    Text("Turns off the camera for a dark, drag-to-explore sky — easier to find objects indoors or under bright lights. You can also toggle this from the sky's mode button.")
+                }
+
+                Section {
                     Toggle("Night vision mode", isOn: $appState.nightMode)
                 } footer: {
                     Text("Tints the whole interface red to protect your dark adaptation.")

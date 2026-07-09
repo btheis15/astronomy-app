@@ -21,6 +21,13 @@ enum ScaleModelTexture {
                                     options: .init(semantic: .color))
     }
 
+    /// Load a bundled texture directly by file key (e.g. "2k_jupiter"), for the
+    /// Sky view's solar-system markers. Nil if the map isn't bundled.
+    static func texture(key: String) -> TextureResource? {
+        guard let cgImage = bundledImage(named: key) else { return nil }
+        return try? TextureResource(image: cgImage, withName: key, options: .init(semantic: .color))
+    }
+
     /// Saturn's ring texture (alpha PNG) if bundled, else nil (tan fallback).
     static func ringTexture() -> TextureResource? {
         guard let cgImage = bundledImage(named: "2k_saturn_ring_alpha") else { return nil }
