@@ -103,7 +103,7 @@ struct SettingsView: View {
                 } header: {
                     Text("About")
                 } footer: {
-                    Text("Star data: Yale Bright Star Catalogue and the HYG database (CC BY-SA 4.0). Deep-sky: Messier, Caldwell & NGC. Ephemerides: Meeus / JPL. Satellite elements: Celestrak.")
+                    Text("Star data: Yale Bright Star Catalogue and the HYG database (CC BY-SA 4.0). Deep-sky: Messier, Caldwell & NGC. Ephemerides: Meeus / JPL. Satellite elements: Celestrak. Planet textures: Solar System Scope (CC BY 4.0).")
                 }
             }
             .navigationTitle("Settings")
