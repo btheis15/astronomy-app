@@ -20,6 +20,7 @@ import RealityKit
 import UIKit
 import simd
 
+@MainActor
 enum SkySceneBuilder {
     /// Radius of the celestial sphere in scene meters. Far enough that
     /// parallax from walking around is negligible, near enough to avoid
