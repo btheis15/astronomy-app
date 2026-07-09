@@ -145,7 +145,7 @@ struct TonightView: View {
         let position = PlanetEphemeris.position(of: planet.planet, julianDate: jd)
         let horizontal = planet.horizontal(julianDate: jd, observer: appState.observer)
         return HStack {
-            Text(planet.planet.symbol).font(.title3).frame(width: 28)
+            PlanetGlyph(planet: planet.planet, size: 30).frame(width: 34)
             VStack(alignment: .leading, spacing: 2) {
                 Text(planet.name)
                 Text("mag \(AstroFormat.magnitude(position.magnitude))")

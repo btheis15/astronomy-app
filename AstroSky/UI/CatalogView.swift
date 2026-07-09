@@ -45,24 +45,26 @@ struct CatalogView: View {
                 }
 
                 Section {
-                    Label("Solar System", systemImage: "sun.max.fill")
+                    Label { Text("Solar System") } icon: { SunGlyph(size: 24) }
                         .tag(CatalogSelection.solarSystem)
-                    Label("Bright Stars", systemImage: "star.fill")
+                    Label { Text("Bright Stars") } icon: {
+                        StarGlyph(magnitude: 0.2, colorIndexBV: 0.0, size: 24)
+                    }
                         .tag(CatalogSelection.brightStars)
-                    Label("Messier Objects", systemImage: "sparkles")
+                    Label { Text("Messier Objects") } icon: { DeepSkyGlyph(type: .nebula, size: 24) }
                         .tag(CatalogSelection.messier)
-                    Label("Caldwell Objects", systemImage: "sparkles")
+                    Label { Text("Caldwell Objects") } icon: { DeepSkyGlyph(type: .galaxy, size: 24) }
                         .tag(CatalogSelection.caldwell)
-                    Label("NGC Highlights", systemImage: "sparkles")
+                    Label { Text("NGC Highlights") } icon: { DeepSkyGlyph(type: .globularCluster, size: 24) }
                         .tag(CatalogSelection.ngc)
-                    Label("Constellations", systemImage: "point.3.connected.trianglepath.dotted")
+                    Label { Text("Constellations") } icon: { CatalogView.constellationCategoryGlyph }
                         .tag(CatalogSelection.constellations)
                 } header: {
                     Text("Catalog")
                 }
 
                 Section {
-                    Label("Featured Satellites", systemImage: "antenna.radiowaves.left.and.right")
+                    Label { Text("Featured Satellites") } icon: { SatelliteGlyph(size: 24) }
                         .tag(CatalogSelection.featuredSatellites)
                     Label("Starlink", systemImage: "wifi")
                         .tag(CatalogSelection.starlink)
@@ -122,6 +124,17 @@ struct CatalogView: View {
         ContentUnavailableView("Select an item",
                                systemImage: "sparkles",
                                description: Text("Browse the sky catalog, your telescope targets and live satellites."))
+    }
+
+    /// Representative stick-figure for the Constellations category row (Orion).
+    @ViewBuilder
+    static var constellationCategoryGlyph: some View {
+        if let orion = ConstellationCatalog.constellations.first(where: { $0.abbreviation == "Ori" })
+            ?? ConstellationCatalog.constellations.first {
+            ConstellationGlyph(constellation: orion, size: 24)
+        } else {
+            Image(systemName: "point.3.connected.trianglepath.dotted")
+        }
     }
 
     private var solarSystemObjects: [any CelestialObject] {
@@ -191,9 +204,8 @@ struct CatalogRow: View {
         let horizontal = object.horizontal(julianDate: appState.skyJulianDate,
                                            observer: appState.observer)
         HStack {
-            Image(systemName: object.kind.iconSystemName)
-                .foregroundStyle(.yellow)
-                .frame(width: 28)
+            ObjectGlyph(object: object, size: 30)
+                .frame(width: 34)
             VStack(alignment: .leading, spacing: 2) {
                 Text(object.name)
                 Text(object.subtitle).font(.caption).foregroundStyle(.secondary)
@@ -234,9 +246,8 @@ struct ConstellationListView: View {
                 ConstellationDetailView(constellation: constellation)
             } label: {
                 HStack {
-                    Image(systemName: "point.3.connected.trianglepath.dotted")
-                        .foregroundStyle(.indigo)
-                        .frame(width: 28)
+                    ConstellationGlyph(constellation: constellation, size: 30)
+                        .frame(width: 34)
                     VStack(alignment: .leading, spacing: 2) {
                         Text(constellation.name)
                         Text("\(constellation.starPairs.count) figure lines · \(constellation.abbreviation)")
@@ -278,6 +289,20 @@ struct ConstellationDetailView: View {
 
     var body: some View {
         List {
+            Section {
+                VStack(spacing: 10) {
+                    ConstellationGlyph(constellation: constellation, size: 132)
+                        .padding(8)
+                        .background(
+                            RoundedRectangle(cornerRadius: 18)
+                                .fill(Color(red: 0.04, green: 0.05, blue: 0.12))
+                        )
+                    Text(constellation.name).font(.title3.weight(.semibold))
+                }
+                .frame(maxWidth: .infinity)
+                .listRowBackground(Color.clear)
+            }
+
             Section {
                 if let center = constellation.centerJ2000 {
                     let horizontal = CoordinateTransforms.horizontal(

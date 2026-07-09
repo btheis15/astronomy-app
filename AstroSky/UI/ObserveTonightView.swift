@@ -55,7 +55,7 @@ struct ObserveTonightView: View {
 
     private func row(_ target: Target) -> some View {
         HStack {
-            Image(systemName: target.object.kind.iconSystemName).foregroundStyle(.yellow).frame(width: 28)
+            ObjectGlyph(object: target.object, size: 30).frame(width: 34)
             VStack(alignment: .leading, spacing: 2) {
                 Text(target.object.name)
                 Text(target.object.subtitle).font(.caption).foregroundStyle(.secondary)

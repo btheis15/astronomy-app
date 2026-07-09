@@ -61,9 +61,8 @@ struct SearchView: View {
             dismiss()
         } label: {
             HStack {
-                Image(systemName: object.kind.iconSystemName)
-                    .foregroundStyle(.yellow)
-                    .frame(width: 28)
+                ObjectGlyph(object: object, size: 30)
+                    .frame(width: 34)
                 VStack(alignment: .leading, spacing: 2) {
                     Text(object.name).foregroundStyle(.primary)
                     Text(object.subtitle).font(.caption).foregroundStyle(.secondary)
