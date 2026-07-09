@@ -32,6 +32,11 @@ struct CatalogView: View {
                     } label: {
                         Label("Observing Log", systemImage: "book.closed")
                     }
+                    NavigationLink {
+                        OrreryView()
+                    } label: {
+                        Label("Solar System Orrery", systemImage: "circle.hexagongrid.fill")
+                    }
                 }
 
                 Section {
