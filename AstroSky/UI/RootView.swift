@@ -11,7 +11,7 @@ struct RootView: View {
     @State private var showOnboarding = false
 
     enum Tab: Hashable {
-        case sky, tonight, catalog, settings
+        case sky, explore, tonight, catalog, settings
     }
 
     var body: some View {
@@ -19,6 +19,10 @@ struct RootView: View {
             SkyTabView()
                 .tabItem { Label("Sky", systemImage: "sparkles.rectangle.stack") }
                 .tag(Tab.sky)
+
+            ExploreTabView()
+                .tabItem { Label("Explore", systemImage: "circle.hexagonpath") }
+                .tag(Tab.explore)
 
             TonightView()
                 .tabItem { Label("Tonight", systemImage: "moon.stars") }
