@@ -211,9 +211,8 @@ struct TonightView: View {
             PassDetailView(pass: pass)
         } label: {
             HStack {
-                Image(systemName: "antenna.radiowaves.left.and.right")
-                    .foregroundStyle(.green)
-                    .frame(width: 28)
+                SatelliteGlyph(size: 30)
+                    .frame(width: 34)
                 VStack(alignment: .leading, spacing: 2) {
                     Text(pass.satelliteName).foregroundStyle(.primary)
                     Text("\(AstroFormat.time(pass.start)) → \(AstroFormat.time(pass.end))")

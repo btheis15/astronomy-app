@@ -285,10 +285,8 @@ struct ObjectCardView: View {
         let position = object.skyPosition(julianDate: appState.skyJulianDate,
                                           observer: appState.observer)
         HStack(spacing: 12) {
-            Image(systemName: object.kind.iconSystemName)
-                .font(.title2)
-                .foregroundStyle(.yellow)
-                .frame(width: 40)
+            ObjectGlyph(object: object, size: 38)
+                .frame(width: 42)
 
             VStack(alignment: .leading, spacing: 2) {
                 Text(object.name).font(.headline)
