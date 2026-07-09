@@ -18,9 +18,20 @@ struct TelescopeSection: View {
         AngularSizeSource.angularSizeRadians(for: object, julianDate: jd)
     }
 
+    /// Eyepiece currently driving the preview — the user's tapped choice, else
+    /// the active eyepiece, else the first one.
+    @State private var selectedEyepieceID: UUID?
+
+    private var resolvedEyepiece: Eyepiece? {
+        let eyepieces = appState.equipment.eyepieces
+        if let id = selectedEyepieceID, let ep = eyepieces.first(where: { $0.id == id }) { return ep }
+        return appState.equipment.activeEyepiece ?? eyepieces.first
+    }
+
     var body: some View {
-        if let optics = appState.activeOptics, let scope = appState.equipment.activeTelescope {
-            previewSection(optics: optics)
+        if let scope = appState.equipment.activeTelescope, let eyepiece = resolvedEyepiece {
+            let optics = TelescopeMath.result(scope: scope, eyepiece: eyepiece, bortleClass: appState.bortleClass)
+            previewSection(optics: optics, eyepiece: eyepiece)
             eyepieceTable(scope: scope)
             tonightSection
             tipsSection(optics: optics)
@@ -38,43 +49,61 @@ struct TelescopeSection: View {
         }
     }
 
-    private func previewSection(optics: OpticsResult) -> some View {
+    private func previewSection(optics: OpticsResult, eyepiece: Eyepiece) -> some View {
         let assessment = TelescopeVisibility.assess(object: object, optics: optics,
                                                     angularSizeRadians: angularSize, bortleClass: appState.bortleClass)
         return Section("Through the eyepiece") {
             EyepiecePreviewView(object: object, optics: optics,
-                                angularSizeRadians: angularSize, bortleClass: appState.bortleClass)
+                                angularSizeRadians: angularSize, bortleClass: appState.bortleClass,
+                                julianDate: jd)
                 .frame(height: 260)
+                .frame(maxWidth: .infinity)
                 .listRowInsets(EdgeInsets())
                 .padding(.vertical, 8)
             HStack {
                 Label(assessment.verdict.rawValue, systemImage: assessment.verdict.systemImage)
                     .font(.subheadline.weight(.semibold))
                 Spacer()
+                Text(eyepiece.name).font(.caption).foregroundStyle(.secondary)
             }
             Text(assessment.reason).font(.caption).foregroundStyle(.secondary)
         }
     }
 
     private func eyepieceTable(scope: Telescope) -> some View {
-        Section("With each of your eyepieces") {
+        Section {
             ForEach(appState.equipment.eyepieces) { eyepiece in
                 let optics = TelescopeMath.result(scope: scope, eyepiece: eyepiece, bortleClass: appState.bortleClass)
                 let assessment = TelescopeVisibility.assess(object: object, optics: optics,
                                                             angularSizeRadians: angularSize, bortleClass: appState.bortleClass)
-                HStack {
-                    VStack(alignment: .leading, spacing: 2) {
-                        Text(eyepiece.name)
-                        Text("\(Int(optics.magnification))× · \(optics.trueFOVDegrees, specifier: "%.2f")° field")
-                            .font(.caption).foregroundStyle(.secondary)
+                let isSelected = eyepiece.id == resolvedEyepiece?.id
+                Button {
+                    selectedEyepieceID = eyepiece.id
+                } label: {
+                    HStack {
+                        VStack(alignment: .leading, spacing: 2) {
+                            Text(eyepiece.name).foregroundStyle(.primary)
+                            Text("\(Int(optics.magnification))× · \(optics.trueFOVDegrees, specifier: "%.2f")° field")
+                                .font(.caption).foregroundStyle(.secondary)
+                        }
+                        Spacer()
+                        if isSelected {
+                            Image(systemName: "checkmark.circle.fill").foregroundStyle(.indigo)
+                        }
+                        Image(systemName: assessment.verdict.systemImage)
+                            .foregroundStyle(color(for: assessment.verdict))
                     }
-                    Spacer()
-                    Image(systemName: assessment.verdict.systemImage)
-                        .foregroundStyle(color(for: assessment.verdict))
                 }
+                .buttonStyle(.plain)
             }
             if appState.equipment.eyepieces.isEmpty {
                 Text("Add an eyepiece to compare magnifications.").font(.caption).foregroundStyle(.secondary)
+            }
+        } header: {
+            Text("With each of your eyepieces")
+        } footer: {
+            if !appState.equipment.eyepieces.isEmpty {
+                Text("Tap an eyepiece to preview it above.")
             }
         }
     }

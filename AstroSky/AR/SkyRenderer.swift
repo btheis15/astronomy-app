@@ -504,7 +504,10 @@ final class SkyRenderer: NSObject {
     func identifyObject(along direction: SIMD3<Float>) -> (any CelestialObject)? {
         let jd = appState.skyJulianDate
         let observer = appState.observer
-        let maxAngle = 5.0 * AstroMath.degToRad
+        // Forgiving, zoom-aware catch radius: a constant ~13% of the field of
+        // view (with a generous floor) so tapping near an object selects it,
+        // even on a wide field where a fixed 5° felt tiny on screen.
+        let maxAngle = max(7.0, Double(currentFOV) * 0.13) * AstroMath.degToRad
 
         var best: (object: any CelestialObject, score: Double)?
 
