@@ -88,4 +88,17 @@ struct SkyCatalog {
     func object(withID id: String) -> (any CelestialObject)? {
         allObjects.first { $0.id == id }
     }
+
+    /// The brightest stars currently above `altitudeDegrees` (stars are stored
+    /// brightest-first). Used for GoTo alignment suggestions and field stars.
+    func brightStarsAbove(altitudeDegrees: Double, julianDate jd: Double,
+                          observer: Observer, limit: Int) -> [Star] {
+        let threshold = altitudeDegrees * AstroMath.degToRad
+        var result: [Star] = []
+        for star in stars where star.horizontal(julianDate: jd, observer: observer).altitude > threshold {
+            result.append(star)
+            if result.count >= limit { break }
+        }
+        return result
+    }
 }

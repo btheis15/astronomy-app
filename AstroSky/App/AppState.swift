@@ -34,6 +34,61 @@ final class AppState {
 
     func resetToLiveTime() { timeOffset = 0 }
 
+    // MARK: Telescope equipment
+
+    var equipment: EquipmentLibrary {
+        get {
+            access(keyPath: \.equipment)
+            guard let data = UserDefaults.standard.data(forKey: "equipmentLibrary"),
+                  let library = try? JSONDecoder().decode(EquipmentLibrary.self, from: data) else {
+                return .empty
+            }
+            return library
+        }
+        set {
+            withMutation(keyPath: \.equipment) {
+                if let data = try? JSONEncoder().encode(newValue) {
+                    UserDefaults.standard.set(data, forKey: "equipmentLibrary")
+                }
+            }
+        }
+    }
+
+    /// Optics for the active scope + eyepiece under the current Bortle sky.
+    var activeOptics: OpticsResult? { equipment.opticsResult(bortleClass: bortleClass) }
+
+    func addTelescope(_ scope: Telescope) {
+        var library = equipment
+        library.telescopes.append(scope)
+        if library.activeTelescopeID == nil { library.activeTelescopeID = scope.id }
+        equipment = library
+    }
+
+    func addEyepiece(_ eyepiece: Eyepiece) {
+        var library = equipment
+        library.eyepieces.append(eyepiece)
+        if library.activeEyepieceID == nil { library.activeEyepieceID = eyepiece.id }
+        equipment = library
+    }
+
+    func deleteTelescope(_ id: UUID) {
+        var library = equipment
+        library.telescopes.removeAll { $0.id == id }
+        if library.activeTelescopeID == id { library.activeTelescopeID = library.telescopes.first?.id }
+        equipment = library
+    }
+
+    func deleteEyepiece(_ id: UUID) {
+        var library = equipment
+        library.eyepieces.removeAll { $0.id == id }
+        if library.activeEyepieceID == id { library.activeEyepieceID = library.eyepieces.first?.id }
+        equipment = library
+    }
+
+    func setActiveTelescope(_ id: UUID) { var l = equipment; l.activeTelescopeID = id; equipment = l }
+    func setActiveEyepiece(_ id: UUID) { var l = equipment; l.activeEyepieceID = id; equipment = l }
+    func setMountType(_ mount: MountType) { var l = equipment; l.mountType = mount; equipment = l }
+
     // MARK: Favorites (any object)
 
     var favoriteObjectIDs: Set<String> {

@@ -23,6 +23,7 @@ struct ObjectDetailView: View {
             AltitudeChartSection(object: object)
             infoSection
             if object.kind != .satellite {
+                TelescopeSection(object: object)
                 Section {
                     Button {
                         showLogSheet = true
