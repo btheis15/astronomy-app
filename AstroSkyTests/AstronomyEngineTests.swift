@@ -188,6 +188,31 @@ struct EventsTests {
     }
 }
 
+struct MinorBodyTests {
+    @Test func ceresIsInTheAsteroidBelt() {
+        // Elements are osculating (epoch 2026-08-13); check the propagated
+        // state is physically sane across the belt for a nearby date.
+        let jd = 2_461_230.5   // 2026-08-... near epoch
+        let ceres = MinorBodyEphemeris.bodies.first { $0.key == "ceres" }!
+        let state = MinorBodyEphemeris.state(ceres, julianDate: jd)
+        // Ceres orbit: a(1±e) ⇒ 2.55–2.99 AU from the Sun.
+        #expect(state.heliocentricDistanceAU > 2.5 && state.heliocentricDistanceAU < 3.0)
+        // Earth–Ceres distance is bounded by (r−1) and (r+1) AU.
+        #expect(state.distanceAU > 1.4 && state.distanceAU < 4.0)
+        #expect(state.magnitude > 5 && state.magnitude < 11)
+        #expect(state.equatorialJ2000.raHours >= 0 && state.equatorialJ2000.raHours < 24)
+    }
+
+    @Test func allMinorBodiesHaveSaneDistances() {
+        let jd = AstroTime.julianDate(Date())
+        for body in MinorBodyEphemeris.bodies {
+            let state = MinorBodyEphemeris.state(body, julianDate: jd)
+            #expect(state.heliocentricDistanceAU > 1.5 && state.heliocentricDistanceAU < 3.6,
+                    "\(body.name) r = \(state.heliocentricDistanceAU)")
+        }
+    }
+}
+
 struct RiseSetTests {
     @Test func sunRisesAndSetsAtMidLatitudes() {
         var components = DateComponents()

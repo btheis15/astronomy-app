@@ -309,6 +309,10 @@ final class SkyRenderer: NSObject {
             positions["planet.\(planet.rawValue)"] =
                 PlanetEphemeris.position(of: planet, julianDate: jd).equatorialJ2000
         }
+        for body in MinorBodyEphemeris.bodies {
+            positions["minor.\(body.key)"] =
+                MinorBodyEphemeris.state(body, julianDate: jd).equatorialJ2000
+        }
         for (id, eq) in positions {
             guard let marker = solarSystemMarkers[id] else { continue }
             let direction = SkySceneBuilder.equatorialVector(eq)
@@ -484,6 +488,7 @@ final class SkyRenderer: NSObject {
         // Solar system + satellites: use live scene positions.
         var solarObjects: [any CelestialObject] = [appState.catalog.sun, appState.catalog.moon]
         solarObjects.append(contentsOf: appState.catalog.planets.map { $0 as any CelestialObject })
+        solarObjects.append(contentsOf: appState.catalog.minorBodies.map { $0 as any CelestialObject })
         for object in solarObjects {
             if let dir = worldDirection(of: object, julianDate: jd, observer: observer),
                object.horizontal(julianDate: jd, observer: observer).altitude > -0.05 {

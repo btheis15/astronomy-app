@@ -567,6 +567,10 @@ enum SkySceneBuilder {
             addMarker(id: "planet.\(planet.rawValue)", labelText: planet.name,
                       color: planetColor(planet), radius: planetMarkerRadius(planet))
         }
+        for body in MinorBodyEphemeris.bodies {
+            addMarker(id: "minor.\(body.key)", labelText: body.name,
+                      color: UIColor(white: 0.78, alpha: 1), radius: 0.6)
+        }
         return (root, markers)
     }
 

@@ -76,6 +76,7 @@ struct CatalogView: View {
     private var solarSystemObjects: [any CelestialObject] {
         var objects: [any CelestialObject] = [appState.catalog.sun, appState.catalog.moon]
         objects.append(contentsOf: appState.catalog.planets.map { $0 as any CelestialObject })
+        objects.append(contentsOf: appState.catalog.minorBodies.map { $0 as any CelestialObject })
         return objects
     }
 

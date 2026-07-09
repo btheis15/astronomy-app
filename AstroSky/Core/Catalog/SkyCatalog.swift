@@ -19,6 +19,7 @@ struct SkyCatalog {
     let sun = SunObject()
     let moon = MoonObject()
     let planets = PlanetObject.all
+    let minorBodies = MinorBodyObject.all
     let deepSky = SkyCatalog.allDeepSky
     let constellations = ConstellationCatalog.constellations
 
@@ -47,6 +48,7 @@ struct SkyCatalog {
     var allObjects: [any CelestialObject] {
         var objects: [any CelestialObject] = [sun, moon]
         objects.append(contentsOf: planets.map { $0 as any CelestialObject })
+        objects.append(contentsOf: minorBodies.map { $0 as any CelestialObject })
         objects.append(contentsOf: StarCatalog.stars.map { $0 as any CelestialObject })
         objects.append(contentsOf: deepSky.map { $0 as any CelestialObject })
         return objects
