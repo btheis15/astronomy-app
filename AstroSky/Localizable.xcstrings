@@ -1,0 +1,2160 @@
+{
+  "sourceLanguage" : "en",
+  "strings" : {
+    "%@ · %@" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "new",
+            "value" : "%1$@ · %2$@"
+          }
+        },
+        "es" : {
+          "stringUnit" : {
+            "state" : "machine_translated",
+            "value" : "%@ · %@"
+          }
+        }
+      }
+    },
+    "%@ → %@" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "new",
+            "value" : "%1$@ → %2$@"
+          }
+        },
+        "es" : {
+          "stringUnit" : {
+            "state" : "machine_translated",
+            "value" : "%1$@ → %2$@"
+          }
+        }
+      }
+    },
+    "%@ is below the horizon" : {
+      "localizations" : {
+        "es" : {
+          "stringUnit" : {
+            "state" : "machine_translated",
+            "value" : "%@ está por debajo del horizonte"
+          }
+        }
+      }
+    },
+    "%@ stays below the horizon over the next 12 hours from your location." : {
+      "localizations" : {
+        "es" : {
+          "stringUnit" : {
+            "state" : "machine_translated",
+            "value" : "%@ permanece por debajo del horizonte durante las próximas 12 horas desde tu ubicación."
+          }
+        }
+      }
+    },
+    "%@, %lld percent illuminated" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "new",
+            "value" : "%1$@, %2$lld percent illuminated"
+          }
+        },
+        "es" : {
+          "stringUnit" : {
+            "state" : "machine_translated",
+            "value" : "%1$@, iluminada al %2$lld por ciento"
+          }
+        }
+      }
+    },
+    "%lld" : {
+      "localizations" : {
+        "es" : {
+          "stringUnit" : {
+            "state" : "machine_translated",
+            "value" : "%lld"
+          }
+        }
+      }
+    },
+    "%lld figure lines · %@" : {
+      "localizations" : {
+        "en" : {
+          "variations" : {
+            "plural" : {
+              "one" : {
+                "stringUnit" : {
+                  "state" : "machine_translated",
+                  "value" : "%1$lld figure line · %2$@"
+                }
+              },
+              "other" : {
+                "stringUnit" : {
+                  "state" : "machine_translated",
+                  "value" : "%1$lld figure lines · %2$@"
+                }
+              },
+              "zero" : {
+                "stringUnit" : {
+                  "state" : "machine_translated",
+                  "value" : "%1$lld figure lines · %2$@"
+                }
+              }
+            }
+          }
+        },
+        "es" : {
+          "variations" : {
+            "plural" : {
+              "one" : {
+                "stringUnit" : {
+                  "state" : "machine_translated",
+                  "value" : "%1$lld línea de figura · %2$@"
+                }
+              },
+              "other" : {
+                "stringUnit" : {
+                  "state" : "machine_translated",
+                  "value" : "%1$lld líneas de figura · %2$@"
+                }
+              },
+              "zero" : {
+                "stringUnit" : {
+                  "state" : "machine_translated",
+                  "value" : "%1$lld líneas de figura · %2$@"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "%lld of %lld Messier objects seen" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "new",
+            "value" : "%1$lld of %2$lld Messier objects seen"
+          }
+        },
+        "es" : {
+          "stringUnit" : {
+            "state" : "machine_translated",
+            "value" : "%1$lld de %2$lld objetos Messier vistos"
+          }
+        }
+      }
+    },
+    "%lld%% illuminated" : {
+      "localizations" : {
+        "es" : {
+          "stringUnit" : {
+            "state" : "machine_translated",
+            "value" : "iluminada al %lld %%"
+          }
+        }
+      }
+    },
+    "%lld°" : {
+      "localizations" : {
+        "es" : {
+          "stringUnit" : {
+            "state" : "machine_translated",
+            "value" : "%lld°"
+          }
+        }
+      }
+    },
+    "%lld× · %.2f° field" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "new",
+            "value" : "%1$lld× · %2$.2f° field"
+          }
+        },
+        "es" : {
+          "stringUnit" : {
+            "state" : "machine_translated",
+            "value" : "%1$lld× · campo de %2$.2f°"
+          }
+        }
+      }
+    },
+    "%lldmm · %lld° AFOV" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "new",
+            "value" : "%1$lldmm · %2$lld° AFOV"
+          }
+        },
+        "es" : {
+          "stringUnit" : {
+            "state" : "machine_translated",
+            "value" : "%1$lld mm · %2$lld° AFOV"
+          }
+        }
+      }
+    },
+    "+1y" : {
+      "localizations" : {
+        "es" : {
+          "stringUnit" : {
+            "state" : "machine_translated",
+            "value" : "+1 a"
+          }
+        }
+      }
+    },
+    "+12h" : {
+      "localizations" : {
+        "es" : {
+          "stringUnit" : {
+            "state" : "machine_translated",
+            "value" : "+12 h"
+          }
+        }
+      }
+    },
+    "±%lld°" : {
+      "localizations" : {
+        "es" : {
+          "stringUnit" : {
+            "state" : "machine_translated",
+            "value" : "±%lld°"
+          }
+        }
+      }
+    },
+    "−1y" : {
+      "localizations" : {
+        "es" : {
+          "stringUnit" : {
+            "state" : "machine_translated",
+            "value" : "−1 a"
+          }
+        }
+      }
+    },
+    "−12h" : {
+      "localizations" : {
+        "es" : {
+          "stringUnit" : {
+            "state" : "machine_translated",
+            "value" : "−12 h"
+          }
+        }
+      }
+    },
+    "☀︎ Use a solar filter" : {
+      "localizations" : {
+        "es" : {
+          "stringUnit" : {
+            "state" : "machine_translated",
+            "value" : "☀︎ Usa un filtro solar"
+          }
+        }
+      }
+    },
+    "About" : {
+      "localizations" : {
+        "es" : {
+          "stringUnit" : {
+            "state" : "machine_translated",
+            "value" : "Información"
+          }
+        }
+      }
+    },
+    "Active" : {
+      "localizations" : {
+        "es" : {
+          "stringUnit" : {
+            "state" : "machine_translated",
+            "value" : "Activo"
+          }
+        }
+      }
+    },
+    "Add an eyepiece to compare magnifications." : {
+      "localizations" : {
+        "es" : {
+          "stringUnit" : {
+            "state" : "machine_translated",
+            "value" : "Añade un ocular para comparar aumentos."
+          }
+        }
+      }
+    },
+    "Add eyepiece" : {
+      "localizations" : {
+        "es" : {
+          "stringUnit" : {
+            "state" : "machine_translated",
+            "value" : "Añadir ocular"
+          }
+        }
+      }
+    },
+    "Add Eyepiece" : {
+      "localizations" : {
+        "es" : {
+          "stringUnit" : {
+            "state" : "machine_translated",
+            "value" : "Añadir ocular"
+          }
+        }
+      }
+    },
+    "Add telescope" : {
+      "localizations" : {
+        "es" : {
+          "stringUnit" : {
+            "state" : "machine_translated",
+            "value" : "Añadir telescopio"
+          }
+        }
+      }
+    },
+    "Add Telescope" : {
+      "localizations" : {
+        "es" : {
+          "stringUnit" : {
+            "state" : "machine_translated",
+            "value" : "Añadir telescopio"
+          }
+        }
+      }
+    },
+    "Add your telescope and eyepieces to see what this looks like through the eyepiece, how hard it is, and how to find it." : {
+      "localizations" : {
+        "es" : {
+          "stringUnit" : {
+            "state" : "machine_translated",
+            "value" : "Añade tu telescopio y tus oculares para ver qué aspecto tiene a través del ocular, su dificultad y cómo encontrarlo."
+          }
+        }
+      }
+    },
+    "Alignment stars up now: %@" : {
+      "localizations" : {
+        "es" : {
+          "stringUnit" : {
+            "state" : "machine_translated",
+            "value" : "Estrellas de alineación visibles ahora: %@"
+          }
+        }
+      }
+    },
+    "Altitude" : {
+      "localizations" : {
+        "es" : {
+          "stringUnit" : {
+            "state" : "machine_translated",
+            "value" : "Altitud"
+          }
+        }
+      }
+    },
+    "Altitude · noon to noon" : {
+      "localizations" : {
+        "es" : {
+          "stringUnit" : {
+            "state" : "machine_translated",
+            "value" : "Altitud · de mediodía a mediodía"
+          }
+        }
+      }
+    },
+    "Aperture (mm)" : {
+      "localizations" : {
+        "es" : {
+          "stringUnit" : {
+            "state" : "machine_translated",
+            "value" : "Apertura (mm)"
+          }
+        }
+      }
+    },
+    "Apparent field of view (°)" : {
+      "localizations" : {
+        "es" : {
+          "stringUnit" : {
+            "state" : "machine_translated",
+            "value" : "Campo de visión aparente (°)"
+          }
+        }
+      }
+    },
+    "Astronomy only needs your rough position — a city-level fix is plenty." : {
+      "localizations" : {
+        "es" : {
+          "stringUnit" : {
+            "state" : "machine_translated",
+            "value" : "La astronomía solo necesita tu posición aproximada; con una precisión a nivel de ciudad basta."
+          }
+        }
+      }
+    },
+    "Below horizon" : {
+      "localizations" : {
+        "es" : {
+          "stringUnit" : {
+            "state" : "machine_translated",
+            "value" : "Bajo el horizonte"
+          }
+        }
+      }
+    },
+    "Best around" : {
+      "localizations" : {
+        "es" : {
+          "stringUnit" : {
+            "state" : "machine_translated",
+            "value" : "Mejor hacia las"
+          }
+        }
+      }
+    },
+    "Bortle %lld" : {
+      "localizations" : {
+        "es" : {
+          "stringUnit" : {
+            "state" : "machine_translated",
+            "value" : "Bortle %lld"
+          }
+        }
+      }
+    },
+    "Bright Stars" : {
+      "localizations" : {
+        "es" : {
+          "stringUnit" : {
+            "state" : "machine_translated",
+            "value" : "Estrellas brillantes"
+          }
+        }
+      }
+    },
+    "Brightest" : {
+      "localizations" : {
+        "es" : {
+          "stringUnit" : {
+            "state" : "machine_translated",
+            "value" : "Más brillante"
+          }
+        }
+      }
+    },
+    "Browse the sky catalog, your telescope targets and live satellites." : {
+      "localizations" : {
+        "es" : {
+          "stringUnit" : {
+            "state" : "machine_translated",
+            "value" : "Explora el catálogo del cielo, tus objetivos de telescopio y satélites en directo."
+          }
+        }
+      }
+    },
+    "Caldwell Objects" : {
+      "localizations" : {
+        "es" : {
+          "stringUnit" : {
+            "state" : "machine_translated",
+            "value" : "Objetos Caldwell"
+          }
+        }
+      }
+    },
+    "Cancel" : {
+      "localizations" : {
+        "es" : {
+          "stringUnit" : {
+            "state" : "machine_translated",
+            "value" : "Cancelar"
+          }
+        }
+      }
+    },
+    "Catalog" : {
+      "localizations" : {
+        "es" : {
+          "stringUnit" : {
+            "state" : "machine_translated",
+            "value" : "Catálogo"
+          }
+        }
+      }
+    },
+    "Celestial equator" : {
+      "localizations" : {
+        "es" : {
+          "stringUnit" : {
+            "state" : "machine_translated",
+            "value" : "Ecuador celeste"
+          }
+        }
+      }
+    },
+    "Checks whether a planet rises high enough to see tonight." : {
+      "localizations" : {
+        "es" : {
+          "stringUnit" : {
+            "state" : "machine_translated",
+            "value" : "Comprueba si un planeta se eleva lo suficiente para verlo esta noche."
+          }
+        }
+      }
+    },
+    "Compass accuracy plus or minus %lld degrees" : {
+      "localizations" : {
+        "en" : {
+          "variations" : {
+            "plural" : {
+              "one" : {
+                "stringUnit" : {
+                  "state" : "machine_translated",
+                  "value" : "Compass accuracy plus or minus %lld degree"
+                }
+              },
+              "other" : {
+                "stringUnit" : {
+                  "state" : "machine_translated",
+                  "value" : "Compass accuracy plus or minus %lld degrees"
+                }
+              },
+              "zero" : {
+                "stringUnit" : {
+                  "state" : "machine_translated",
+                  "value" : "Compass accuracy plus or minus %lld degrees"
+                }
+              }
+            }
+          }
+        },
+        "es" : {
+          "variations" : {
+            "plural" : {
+              "one" : {
+                "stringUnit" : {
+                  "state" : "machine_translated",
+                  "value" : "Precisión de la brújula de más o menos %lld grado"
+                }
+              },
+              "other" : {
+                "stringUnit" : {
+                  "state" : "machine_translated",
+                  "value" : "Precisión de la brújula de más o menos %lld grados"
+                }
+              },
+              "zero" : {
+                "stringUnit" : {
+                  "state" : "machine_translated",
+                  "value" : "Precisión de la brújula de más o menos %lld grados"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "Computing passes…" : {
+      "localizations" : {
+        "es" : {
+          "stringUnit" : {
+            "state" : "machine_translated",
+            "value" : "Calculando pasos…"
+          }
+        }
+      }
+    },
+    "Conditions" : {
+      "localizations" : {
+        "es" : {
+          "stringUnit" : {
+            "state" : "machine_translated",
+            "value" : "Condiciones"
+          }
+        }
+      }
+    },
+    "Constellation figures" : {
+      "localizations" : {
+        "es" : {
+          "stringUnit" : {
+            "state" : "machine_translated",
+            "value" : "Figuras de constelaciones"
+          }
+        }
+      }
+    },
+    "Constellations" : {
+      "localizations" : {
+        "es" : {
+          "stringUnit" : {
+            "state" : "machine_translated",
+            "value" : "Constelaciones"
+          }
+        }
+      }
+    },
+    "Current" : {
+      "localizations" : {
+        "es" : {
+          "stringUnit" : {
+            "state" : "machine_translated",
+            "value" : "Actual"
+          }
+        }
+      }
+    },
+    "Deep-sky objects (Messier)" : {
+      "localizations" : {
+        "es" : {
+          "stringUnit" : {
+            "state" : "machine_translated",
+            "value" : "Objetos de cielo profundo (Messier)"
+          }
+        }
+      }
+    },
+    "Details" : {
+      "localizations" : {
+        "es" : {
+          "stringUnit" : {
+            "state" : "machine_translated",
+            "value" : "Detalles"
+          }
+        }
+      }
+    },
+    "Diameter" : {
+      "localizations" : {
+        "es" : {
+          "stringUnit" : {
+            "state" : "machine_translated",
+            "value" : "Diámetro"
+          }
+        }
+      }
+    },
+    "Distance from primary" : {
+      "localizations" : {
+        "es" : {
+          "stringUnit" : {
+            "state" : "machine_translated",
+            "value" : "Distancia al primario"
+          }
+        }
+      }
+    },
+    "Done" : {
+      "localizations" : {
+        "es" : {
+          "stringUnit" : {
+            "state" : "machine_translated",
+            "value" : "OK"
+          }
+        }
+      }
+    },
+    "Ecliptic" : {
+      "localizations" : {
+        "es" : {
+          "stringUnit" : {
+            "state" : "machine_translated",
+            "value" : "Eclíptica"
+          }
+        }
+      }
+    },
+    "Entries" : {
+      "localizations" : {
+        "es" : {
+          "stringUnit" : {
+            "state" : "machine_translated",
+            "value" : "Entradas"
+          }
+        }
+      }
+    },
+    "Ephemeris" : {
+      "localizations" : {
+        "es" : {
+          "stringUnit" : {
+            "state" : "machine_translated",
+            "value" : "Efemérides"
+          }
+        }
+      }
+    },
+    "Explore" : {
+      "localizations" : {
+        "es" : {
+          "stringUnit" : {
+            "state" : "machine_translated",
+            "value" : "Explorar"
+          }
+        }
+      }
+    },
+    "Extends beyond the field of view" : {
+      "localizations" : {
+        "es" : {
+          "stringUnit" : {
+            "state" : "machine_translated",
+            "value" : "Se extiende más allá del campo de visión"
+          }
+        }
+      }
+    },
+    "Eyepieces" : {
+      "localizations" : {
+        "es" : {
+          "stringUnit" : {
+            "state" : "machine_translated",
+            "value" : "Oculares"
+          }
+        }
+      }
+    },
+    "f=%lldmm · ⌀%lldmm · f/%.1f" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "new",
+            "value" : "f=%1$lldmm · ⌀%2$lldmm · f/%3$.1f"
+          }
+        },
+        "es" : {
+          "stringUnit" : {
+            "state" : "machine_translated",
+            "value" : "f=%1$lld mm · ⌀%2$lld mm · f/%3$.1f"
+          }
+        }
+      }
+    },
+    "Facts" : {
+      "localizations" : {
+        "es" : {
+          "stringUnit" : {
+            "state" : "machine_translated",
+            "value" : "Datos"
+          }
+        }
+      }
+    },
+    "Faintest stars" : {
+      "localizations" : {
+        "es" : {
+          "stringUnit" : {
+            "state" : "machine_translated",
+            "value" : "Estrellas más débiles"
+          }
+        }
+      }
+    },
+    "Favorites" : {
+      "localizations" : {
+        "es" : {
+          "stringUnit" : {
+            "state" : "machine_translated",
+            "value" : "Favoritos"
+          }
+        }
+      }
+    },
+    "Featured Satellites" : {
+      "localizations" : {
+        "es" : {
+          "stringUnit" : {
+            "state" : "machine_translated",
+            "value" : "Satélites destacados"
+          }
+        }
+      }
+    },
+    "Fetching satellite data…" : {
+      "localizations" : {
+        "es" : {
+          "stringUnit" : {
+            "state" : "machine_translated",
+            "value" : "Obteniendo datos de satélite…"
+          }
+        }
+      }
+    },
+    "Find in AR" : {
+      "localizations" : {
+        "es" : {
+          "stringUnit" : {
+            "state" : "machine_translated",
+            "value" : "Buscar en RA"
+          }
+        }
+      }
+    },
+    "Find it · %@" : {
+      "localizations" : {
+        "es" : {
+          "stringUnit" : {
+            "state" : "machine_translated",
+            "value" : "Cómo encontrarlo · %@"
+          }
+        }
+      }
+    },
+    "Finding tonight's targets…" : {
+      "localizations" : {
+        "es" : {
+          "stringUnit" : {
+            "state" : "machine_translated",
+            "value" : "Buscando los objetivos de esta noche…"
+          }
+        }
+      }
+    },
+    "Finds the next visible pass of the International Space Station." : {
+      "localizations" : {
+        "es" : {
+          "stringUnit" : {
+            "state" : "machine_translated",
+            "value" : "Busca el próximo paso visible de la Estación Espacial Internacional."
+          }
+        }
+      }
+    },
+    "Focal length (mm)" : {
+      "localizations" : {
+        "es" : {
+          "stringUnit" : {
+            "state" : "machine_translated",
+            "value" : "Distancia focal (mm)"
+          }
+        }
+      }
+    },
+    "Great-circle overlays: the ecliptic (the Sun and planets' path), the celestial equator, and a right-ascension/declination grid." : {
+      "localizations" : {
+        "es" : {
+          "stringUnit" : {
+            "state" : "machine_translated",
+            "value" : "Superposiciones de círculos máximos: la eclíptica (la trayectoria del Sol y los planetas), el ecuador celeste y una cuadrícula de ascensión recta/declinación."
+          }
+        }
+      }
+    },
+    "Horizon" : {
+      "localizations" : {
+        "es" : {
+          "stringUnit" : {
+            "state" : "machine_translated",
+            "value" : "Horizonte"
+          }
+        }
+      }
+    },
+    "Is a Planet Visible Tonight" : {
+      "localizations" : {
+        "es" : {
+          "stringUnit" : {
+            "state" : "machine_translated",
+            "value" : "¿Hay algún planeta visible esta noche?"
+          }
+        }
+      }
+    },
+    "Jupiter" : {
+      "localizations" : {
+        "es" : {
+          "stringUnit" : {
+            "state" : "machine_translated",
+            "value" : "Júpiter"
+          }
+        }
+      }
+    },
+    "Labels" : {
+      "localizations" : {
+        "es" : {
+          "stringUnit" : {
+            "state" : "machine_translated",
+            "value" : "Etiquetas"
+          }
+        }
+      }
+    },
+    "Latitude" : {
+      "localizations" : {
+        "es" : {
+          "stringUnit" : {
+            "state" : "machine_translated",
+            "value" : "Latitud"
+          }
+        }
+      }
+    },
+    "Limiting magnitude" : {
+      "localizations" : {
+        "es" : {
+          "stringUnit" : {
+            "state" : "machine_translated",
+            "value" : "Magnitud límite"
+          }
+        }
+      }
+    },
+    "Live" : {
+      "localizations" : {
+        "es" : {
+          "stringUnit" : {
+            "state" : "machine_translated",
+            "value" : "En directo"
+          }
+        }
+      }
+    },
+    "Location" : {
+      "localizations" : {
+        "es" : {
+          "stringUnit" : {
+            "state" : "machine_translated",
+            "value" : "Ubicación"
+          }
+        }
+      }
+    },
+    "Location access denied — enter coordinates below or enable access in Settings." : {
+      "localizations" : {
+        "es" : {
+          "stringUnit" : {
+            "state" : "machine_translated",
+            "value" : "Acceso a la ubicación denegado — introduce las coordenadas abajo o habilita el acceso en Ajustes."
+          }
+        }
+      }
+    },
+    "Log observation" : {
+      "localizations" : {
+        "es" : {
+          "stringUnit" : {
+            "state" : "machine_translated",
+            "value" : "Registrar observación"
+          }
+        }
+      }
+    },
+    "Log Observation" : {
+      "localizations" : {
+        "es" : {
+          "stringUnit" : {
+            "state" : "machine_translated",
+            "value" : "Registrar observación"
+          }
+        }
+      }
+    },
+    "Longitude" : {
+      "localizations" : {
+        "es" : {
+          "stringUnit" : {
+            "state" : "machine_translated",
+            "value" : "Longitud"
+          }
+        }
+      }
+    },
+    "mag %.1f" : {
+      "localizations" : {
+        "es" : {
+          "stringUnit" : {
+            "state" : "machine_translated",
+            "value" : "mag %.1f"
+          }
+        }
+      }
+    },
+    "mag %@" : {
+      "localizations" : {
+        "es" : {
+          "stringUnit" : {
+            "state" : "machine_translated",
+            "value" : "mag %@"
+          }
+        }
+      }
+    },
+    "Magnification" : {
+      "localizations" : {
+        "es" : {
+          "stringUnit" : {
+            "state" : "machine_translated",
+            "value" : "Aumento"
+          }
+        }
+      }
+    },
+    "Mars" : {
+      "localizations" : {
+        "es" : {
+          "stringUnit" : {
+            "state" : "machine_translated",
+            "value" : "Marte"
+          }
+        }
+      }
+    },
+    "max %@" : {
+      "localizations" : {
+        "es" : {
+          "stringUnit" : {
+            "state" : "machine_translated",
+            "value" : "máx. %@"
+          }
+        }
+      }
+    },
+    "Mercury" : {
+      "localizations" : {
+        "es" : {
+          "stringUnit" : {
+            "state" : "machine_translated",
+            "value" : "Mercurio"
+          }
+        }
+      }
+    },
+    "Messier objects" : {
+      "localizations" : {
+        "es" : {
+          "stringUnit" : {
+            "state" : "machine_translated",
+            "value" : "Objetos Messier"
+          }
+        }
+      }
+    },
+    "Messier Objects" : {
+      "localizations" : {
+        "es" : {
+          "stringUnit" : {
+            "state" : "machine_translated",
+            "value" : "Objetos Messier"
+          }
+        }
+      }
+    },
+    "Messier objects seen" : {
+      "localizations" : {
+        "es" : {
+          "stringUnit" : {
+            "state" : "machine_translated",
+            "value" : "Objetos Messier vistos"
+          }
+        }
+      }
+    },
+    "Meteor shower radiants" : {
+      "localizations" : {
+        "es" : {
+          "stringUnit" : {
+            "state" : "machine_translated",
+            "value" : "Radiantes de lluvias de meteoros"
+          }
+        }
+      }
+    },
+    "Milky Way" : {
+      "localizations" : {
+        "es" : {
+          "stringUnit" : {
+            "state" : "machine_translated",
+            "value" : "Vía Láctea"
+          }
+        }
+      }
+    },
+    "Moon" : {
+      "localizations" : {
+        "es" : {
+          "stringUnit" : {
+            "state" : "machine_translated",
+            "value" : "Luna"
+          }
+        }
+      }
+    },
+    "Moon Phase" : {
+      "localizations" : {
+        "es" : {
+          "stringUnit" : {
+            "state" : "machine_translated",
+            "value" : "Fase de la Luna"
+          }
+        }
+      }
+    },
+    "Mount" : {
+      "localizations" : {
+        "es" : {
+          "stringUnit" : {
+            "state" : "machine_translated",
+            "value" : "Montura"
+          }
+        }
+      }
+    },
+    "Mount type" : {
+      "localizations" : {
+        "es" : {
+          "stringUnit" : {
+            "state" : "machine_translated",
+            "value" : "Tipo de montura"
+          }
+        }
+      }
+    },
+    "Name" : {
+      "localizations" : {
+        "es" : {
+          "stringUnit" : {
+            "state" : "machine_translated",
+            "value" : "Nombre"
+          }
+        }
+      }
+    },
+    "Name (e.g. 25mm Plössl)" : {
+      "localizations" : {
+        "es" : {
+          "stringUnit" : {
+            "state" : "machine_translated",
+            "value" : "Nombre (p. ej., Plössl de 25 mm)"
+          }
+        }
+      }
+    },
+    "Name (e.g. My Dobsonian)" : {
+      "localizations" : {
+        "es" : {
+          "stringUnit" : {
+            "state" : "machine_translated",
+            "value" : "Nombre (p. ej., mi Dobson)"
+          }
+        }
+      }
+    },
+    "Neptune" : {
+      "localizations" : {
+        "es" : {
+          "stringUnit" : {
+            "state" : "machine_translated",
+            "value" : "Neptuno"
+          }
+        }
+      }
+    },
+    "New to telescopes? Tap “Add” above and pick a preset that looks like your gear — you can fine-tune the numbers afterward." : {
+      "localizations" : {
+        "es" : {
+          "stringUnit" : {
+            "state" : "machine_translated",
+            "value" : "¿Nuevo con los telescopios? Toca “Añadir” arriba y elige un ajuste predefinido que se parezca a tu equipo — luego podrás afinar los números."
+          }
+        }
+      }
+    },
+    "Next ISS Pass" : {
+      "localizations" : {
+        "es" : {
+          "stringUnit" : {
+            "state" : "machine_translated",
+            "value" : "Próximo paso de la ISS"
+          }
+        }
+      }
+    },
+    "NGC Highlights" : {
+      "localizations" : {
+        "es" : {
+          "stringUnit" : {
+            "state" : "machine_translated",
+            "value" : "NGC destacados"
+          }
+        }
+      }
+    },
+    "Night vision mode" : {
+      "localizations" : {
+        "es" : {
+          "stringUnit" : {
+            "state" : "machine_translated",
+            "value" : "Modo visión nocturna"
+          }
+        }
+      }
+    },
+    "No bright passes in the next 24 hours." : {
+      "localizations" : {
+        "es" : {
+          "stringUnit" : {
+            "state" : "machine_translated",
+            "value" : "No hay pasos brillantes en las próximas 24 horas."
+          }
+        }
+      }
+    },
+    "No catalog targets are both within your scope's reach and high enough tonight." : {
+      "localizations" : {
+        "es" : {
+          "stringUnit" : {
+            "state" : "machine_translated",
+            "value" : "Ningún objetivo del catálogo está a la vez al alcance de tu telescopio y lo bastante alto esta noche."
+          }
+        }
+      }
+    },
+    "No ISS passes are predicted over the next 48 hours from your location." : {
+      "localizations" : {
+        "es" : {
+          "stringUnit" : {
+            "state" : "machine_translated",
+            "value" : "No se prevén pasos de la ISS durante las próximas 48 horas desde tu ubicación."
+          }
+        }
+      }
+    },
+    "No observations yet" : {
+      "localizations" : {
+        "es" : {
+          "stringUnit" : {
+            "state" : "machine_translated",
+            "value" : "Aún no hay observaciones"
+          }
+        }
+      }
+    },
+    "Not well placed during tonight's dark hours from your location." : {
+      "localizations" : {
+        "es" : {
+          "stringUnit" : {
+            "state" : "machine_translated",
+            "value" : "Mal situado durante las horas de oscuridad de esta noche desde tu ubicación."
+          }
+        }
+      }
+    },
+    "Notes" : {
+      "localizations" : {
+        "es" : {
+          "stringUnit" : {
+            "state" : "machine_translated",
+            "value" : "Notas"
+          }
+        }
+      }
+    },
+    "Nothing here yet" : {
+      "localizations" : {
+        "es" : {
+          "stringUnit" : {
+            "state" : "machine_translated",
+            "value" : "Aún no hay nada aquí"
+          }
+        }
+      }
+    },
+    "Nothing well-placed" : {
+      "localizations" : {
+        "es" : {
+          "stringUnit" : {
+            "state" : "machine_translated",
+            "value" : "Nada bien situado"
+          }
+        }
+      }
+    },
+    "Notify me before passes" : {
+      "localizations" : {
+        "es" : {
+          "stringUnit" : {
+            "state" : "machine_translated",
+            "value" : "Avisarme antes de los pasos"
+          }
+        }
+      }
+    },
+    "Now" : {
+      "localizations" : {
+        "es" : {
+          "stringUnit" : {
+            "state" : "machine_translated",
+            "value" : "Ahora"
+          }
+        }
+      }
+    },
+    "Object" : {
+      "localizations" : {
+        "es" : {
+          "stringUnit" : {
+            "state" : "machine_translated",
+            "value" : "Objeto"
+          }
+        }
+      }
+    },
+    "Observe Tonight" : {
+      "localizations" : {
+        "es" : {
+          "stringUnit" : {
+            "state" : "machine_translated",
+            "value" : "Observa esta noche"
+          }
+        }
+      }
+    },
+    "Observe Tonight · your telescope" : {
+      "localizations" : {
+        "es" : {
+          "stringUnit" : {
+            "state" : "machine_translated",
+            "value" : "Observa esta noche · tu telescopio"
+          }
+        }
+      }
+    },
+    "Observing Log" : {
+      "localizations" : {
+        "es" : {
+          "stringUnit" : {
+            "state" : "machine_translated",
+            "value" : "Registro de observación"
+          }
+        }
+      }
+    },
+    "Observing tips" : {
+      "localizations" : {
+        "es" : {
+          "stringUnit" : {
+            "state" : "machine_translated",
+            "value" : "Consejos de observación"
+          }
+        }
+      }
+    },
+    "of %lld" : {
+      "localizations" : {
+        "es" : {
+          "stringUnit" : {
+            "state" : "machine_translated",
+            "value" : "de %lld"
+          }
+        }
+      }
+    },
+    "On target: %@" : {
+      "localizations" : {
+        "es" : {
+          "stringUnit" : {
+            "state" : "machine_translated",
+            "value" : "En el objetivo: %@"
+          }
+        }
+      }
+    },
+    "Open AstroSky once while online so I can download the ISS orbit, then ask again." : {
+      "localizations" : {
+        "es" : {
+          "stringUnit" : {
+            "state" : "machine_translated",
+            "value" : "Abre AstroSky una vez con conexión para que pueda descargar la órbita de la ISS y vuelve a preguntar."
+          }
+        }
+      }
+    },
+    "Orbital elements from Celestrak" : {
+      "localizations" : {
+        "es" : {
+          "stringUnit" : {
+            "state" : "machine_translated",
+            "value" : "Elementos orbitales de Celestrak"
+          }
+        }
+      }
+    },
+    "Orbital elements from Celestrak · updated %@" : {
+      "localizations" : {
+        "es" : {
+          "stringUnit" : {
+            "state" : "machine_translated",
+            "value" : "Elementos orbitales de Celestrak · actualizado %@"
+          }
+        }
+      }
+    },
+    "Orrery" : {
+      "localizations" : {
+        "es" : {
+          "stringUnit" : {
+            "state" : "machine_translated",
+            "value" : "Planetario"
+          }
+        }
+      }
+    },
+    "Pass" : {
+      "localizations" : {
+        "es" : {
+          "stringUnit" : {
+            "state" : "machine_translated",
+            "value" : "Paso"
+          }
+        }
+      }
+    },
+    "Passes where the satellite is sunlit against a dark sky, ≥ 10° up." : {
+      "localizations" : {
+        "es" : {
+          "stringUnit" : {
+            "state" : "machine_translated",
+            "value" : "Pasos en los que el satélite está iluminado por el Sol contra un cielo oscuro, a ≥ 10° de altitud."
+          }
+        }
+      }
+    },
+    "Peak altitude" : {
+      "localizations" : {
+        "es" : {
+          "stringUnit" : {
+            "state" : "machine_translated",
+            "value" : "Altitud máxima"
+          }
+        }
+      }
+    },
+    "Place" : {
+      "localizations" : {
+        "es" : {
+          "stringUnit" : {
+            "state" : "machine_translated",
+            "value" : "Lugar"
+          }
+        }
+      }
+    },
+    "Planet" : {
+      "localizations" : {
+        "es" : {
+          "stringUnit" : {
+            "state" : "machine_translated",
+            "value" : "Planeta"
+          }
+        }
+      }
+    },
+    "Planet Visibility" : {
+      "localizations" : {
+        "es" : {
+          "stringUnit" : {
+            "state" : "machine_translated",
+            "value" : "Visibilidad de planetas"
+          }
+        }
+      }
+    },
+    "Planets tonight" : {
+      "localizations" : {
+        "es" : {
+          "stringUnit" : {
+            "state" : "machine_translated",
+            "value" : "Planetas esta noche"
+          }
+        }
+      }
+    },
+    "Point at the floor or a table, then tap to place" : {
+      "localizations" : {
+        "es" : {
+          "stringUnit" : {
+            "state" : "machine_translated",
+            "value" : "Apunta al suelo o a una mesa y toca para colocar"
+          }
+        }
+      }
+    },
+    "Position now" : {
+      "localizations" : {
+        "es" : {
+          "stringUnit" : {
+            "state" : "machine_translated",
+            "value" : "Posición actual"
+          }
+        }
+      }
+    },
+    "RA/Dec grid" : {
+      "localizations" : {
+        "es" : {
+          "stringUnit" : {
+            "state" : "machine_translated",
+            "value" : "Cuadrícula RA/Dec"
+          }
+        }
+      }
+    },
+    "Rating" : {
+      "localizations" : {
+        "es" : {
+          "stringUnit" : {
+            "state" : "machine_translated",
+            "value" : "Valoración"
+          }
+        }
+      }
+    },
+    "Reference lines" : {
+      "localizations" : {
+        "es" : {
+          "stringUnit" : {
+            "state" : "machine_translated",
+            "value" : "Líneas de referencia"
+          }
+        }
+      }
+    },
+    "Satellite data loads from Celestrak when online." : {
+      "localizations" : {
+        "es" : {
+          "stringUnit" : {
+            "state" : "machine_translated",
+            "value" : "Los datos de satélite se cargan desde Celestrak cuando hay conexión."
+          }
+        }
+      }
+    },
+    "Satellite propagator" : {
+      "localizations" : {
+        "es" : {
+          "stringUnit" : {
+            "state" : "machine_translated",
+            "value" : "Propagador de satélites"
+          }
+        }
+      }
+    },
+    "Satellites" : {
+      "localizations" : {
+        "es" : {
+          "stringUnit" : {
+            "state" : "machine_translated",
+            "value" : "Satélites"
+          }
+        }
+      }
+    },
+    "Satellites tracked" : {
+      "localizations" : {
+        "es" : {
+          "stringUnit" : {
+            "state" : "machine_translated",
+            "value" : "Satélites rastreados"
+          }
+        }
+      }
+    },
+    "Saturn" : {
+      "localizations" : {
+        "es" : {
+          "stringUnit" : {
+            "state" : "machine_translated",
+            "value" : "Saturno"
+          }
+        }
+      }
+    },
+    "Save" : {
+      "localizations" : {
+        "es" : {
+          "stringUnit" : {
+            "state" : "machine_translated",
+            "value" : "Guardar"
+          }
+        }
+      }
+    },
+    "Scale" : {
+      "localizations" : {
+        "es" : {
+          "stringUnit" : {
+            "state" : "machine_translated",
+            "value" : "Escala"
+          }
+        }
+      }
+    },
+    "Search the sky" : {
+      "localizations" : {
+        "es" : {
+          "stringUnit" : {
+            "state" : "machine_translated",
+            "value" : "Busca en el cielo"
+          }
+        }
+      }
+    },
+    "Seeing" : {
+      "localizations" : {
+        "es" : {
+          "stringUnit" : {
+            "state" : "machine_translated",
+            "value" : "Seeing (estabilidad)"
+          }
+        }
+      }
+    },
+    "Select an item" : {
+      "localizations" : {
+        "es" : {
+          "stringUnit" : {
+            "state" : "machine_translated",
+            "value" : "Selecciona un elemento"
+          }
+        }
+      }
+    },
+    "Set" : {
+      "localizations" : {
+        "es" : {
+          "stringUnit" : {
+            "state" : "machine_translated",
+            "value" : "Establecer"
+          }
+        }
+      }
+    },
+    "Set up my telescope" : {
+      "localizations" : {
+        "es" : {
+          "stringUnit" : {
+            "state" : "machine_translated",
+            "value" : "Configurar mi telescopio"
+          }
+        }
+      }
+    },
+    "Set up my telescope first" : {
+      "localizations" : {
+        "es" : {
+          "stringUnit" : {
+            "state" : "machine_translated",
+            "value" : "Configura primero mi telescopio"
+          }
+        }
+      }
+    },
+    "Set up your gear to see what each object looks like through the eyepiece, how hard it is, and how to find it." : {
+      "localizations" : {
+        "es" : {
+          "stringUnit" : {
+            "state" : "machine_translated",
+            "value" : "Configura tu equipo para ver qué aspecto tiene cada objeto a través del ocular, su dificultad y cómo encontrarlo."
+          }
+        }
+      }
+    },
+    "Settings" : {
+      "localizations" : {
+        "es" : {
+          "stringUnit" : {
+            "state" : "machine_translated",
+            "value" : "Ajustes"
+          }
+        }
+      }
+    },
+    "Shows the ISS, Hubble and other naked-eye satellites. The Starlink option adds up to 300 Starlink satellites from live Celestrak data. Star a satellite in the Catalog to get a heads-up 10 minutes before its visible passes." : {
+      "localizations" : {
+        "es" : {
+          "stringUnit" : {
+            "state" : "machine_translated",
+            "value" : "Muestra la ISS, el Hubble y otros satélites visibles a simple vista. La opción Starlink añade hasta 300 satélites Starlink a partir de datos en directo de Celestrak. Marca un satélite con una estrella en el Catálogo para recibir un aviso 10 minutos antes de sus pasos visibles."
+          }
+        }
+      }
+    },
+    "Size estimated" : {
+      "localizations" : {
+        "es" : {
+          "stringUnit" : {
+            "state" : "machine_translated",
+            "value" : "Tamaño estimado"
+          }
+        }
+      }
+    },
+    "Skip" : {
+      "localizations" : {
+        "es" : {
+          "stringUnit" : {
+            "state" : "machine_translated",
+            "value" : "Omitir"
+          }
+        }
+      }
+    },
+    "Sky" : {
+      "localizations" : {
+        "es" : {
+          "stringUnit" : {
+            "state" : "machine_translated",
+            "value" : "Cielo"
+          }
+        }
+      }
+    },
+    "Sky darkness" : {
+      "localizations" : {
+        "es" : {
+          "stringUnit" : {
+            "state" : "machine_translated",
+            "value" : "Oscuridad del cielo"
+          }
+        }
+      }
+    },
+    "Sky display" : {
+      "localizations" : {
+        "es" : {
+          "stringUnit" : {
+            "state" : "machine_translated",
+            "value" : "Visualización del cielo"
+          }
+        }
+      }
+    },
+    "Sky events · next 30 days" : {
+      "localizations" : {
+        "es" : {
+          "stringUnit" : {
+            "state" : "machine_translated",
+            "value" : "Eventos del cielo · próximos 30 días"
+          }
+        }
+      }
+    },
+    "Solar System" : {
+      "localizations" : {
+        "es" : {
+          "stringUnit" : {
+            "state" : "machine_translated",
+            "value" : "Sistema solar"
+          }
+        }
+      }
+    },
+    "Solar System Orrery" : {
+      "localizations" : {
+        "es" : {
+          "stringUnit" : {
+            "state" : "machine_translated",
+            "value" : "Planetario del sistema solar"
+          }
+        }
+      }
+    },
+    "Sort" : {
+      "localizations" : {
+        "es" : {
+          "stringUnit" : {
+            "state" : "machine_translated",
+            "value" : "Ordenar"
+          }
+        }
+      }
+    },
+    "Star catalog" : {
+      "localizations" : {
+        "es" : {
+          "stringUnit" : {
+            "state" : "machine_translated",
+            "value" : "Catálogo de estrellas"
+          }
+        }
+      }
+    },
+    "Star data: Yale Bright Star Catalogue and the HYG database (CC BY-SA 4.0). Deep-sky: Messier, Caldwell & NGC. Ephemerides: Meeus / JPL. Satellite elements: Celestrak. Planet textures: Solar System Scope (CC BY 4.0)." : {
+      "localizations" : {
+        "es" : {
+          "stringUnit" : {
+            "state" : "machine_translated",
+            "value" : "Datos de estrellas: Yale Bright Star Catalogue y la base de datos HYG (CC BY-SA 4.0). Cielo profundo: Messier, Caldwell y NGC. Efemérides: Meeus / JPL. Elementos de satélite: Celestrak. Texturas de planetas: Solar System Scope (CC BY 4.0)."
+          }
+        }
+      }
+    },
+    "Starlink" : {
+      "localizations" : {
+        "es" : {
+          "stringUnit" : {
+            "state" : "machine_translated",
+            "value" : "Starlink"
+          }
+        }
+      }
+    },
+    "Starlink constellation" : {
+      "localizations" : {
+        "es" : {
+          "stringUnit" : {
+            "state" : "machine_translated",
+            "value" : "Constelación Starlink"
+          }
+        }
+      }
+    },
+    "Stars, planets, M31, ISS, Starlink…" : {
+      "localizations" : {
+        "es" : {
+          "stringUnit" : {
+            "state" : "machine_translated",
+            "value" : "Estrellas, planetas, M31, ISS, Starlink…"
+          }
+        }
+      }
+    },
+    "Start from a preset" : {
+      "localizations" : {
+        "es" : {
+          "stringUnit" : {
+            "state" : "machine_translated",
+            "value" : "Empezar con un ajuste predefinido"
+          }
+        }
+      }
+    },
+    "Stays fairly low tonight — a clear horizon helps." : {
+      "localizations" : {
+        "es" : {
+          "stringUnit" : {
+            "state" : "machine_translated",
+            "value" : "Se mantiene bastante bajo esta noche — un horizonte despejado ayuda."
+          }
+        }
+      }
+    },
+    "Stop guiding" : {
+      "localizations" : {
+        "es" : {
+          "stringUnit" : {
+            "state" : "machine_translated",
+            "value" : "Detener guiado"
+          }
+        }
+      }
+    },
+    "Suggestions" : {
+      "localizations" : {
+        "es" : {
+          "stringUnit" : {
+            "state" : "machine_translated",
+            "value" : "Sugerencias"
+          }
+        }
+      }
+    },
+    "Sun & twilight" : {
+      "localizations" : {
+        "es" : {
+          "stringUnit" : {
+            "state" : "machine_translated",
+            "value" : "Sol y crepúsculo"
+          }
+        }
+      }
+    },
+    "Tap “Log observation” on any object to start your log." : {
+      "localizations" : {
+        "es" : {
+          "stringUnit" : {
+            "state" : "machine_translated",
+            "value" : "Toca “Registrar observación” en cualquier objeto para empezar tu registro."
+          }
+        }
+      }
+    },
+    "Telescope" : {
+      "localizations" : {
+        "es" : {
+          "stringUnit" : {
+            "state" : "machine_translated",
+            "value" : "Telescopio"
+          }
+        }
+      }
+    },
+    "Telescope & eyepieces" : {
+      "localizations" : {
+        "es" : {
+          "stringUnit" : {
+            "state" : "machine_translated",
+            "value" : "Telescopio y oculares"
+          }
+        }
+      }
+    },
+    "Telescope Equipment" : {
+      "localizations" : {
+        "es" : {
+          "stringUnit" : {
+            "state" : "machine_translated",
+            "value" : "Equipo de telescopio"
+          }
+        }
+      }
+    },
+    "Telescopes" : {
+      "localizations" : {
+        "es" : {
+          "stringUnit" : {
+            "state" : "machine_translated",
+            "value" : "Telescopios"
+          }
+        }
+      }
+    },
+    "Tells you the current Moon phase and illumination." : {
+      "localizations" : {
+        "es" : {
+          "stringUnit" : {
+            "state" : "machine_translated",
+            "value" : "Te dice la fase actual de la Luna y su iluminación."
+          }
+        }
+      }
+    },
+    "The Moon is a %@, %lld%% illuminated." : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "new",
+            "value" : "The Moon is a %1$@, %2$lld%% illuminated."
+          }
+        },
+        "es" : {
+          "stringUnit" : {
+            "state" : "machine_translated",
+            "value" : "La Luna está en fase %1$@, iluminada al %2$lld %%."
+          }
+        }
+      }
+    },
+    "The next ISS pass is %@ on %@, peaking near %lld° altitude." : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "new",
+            "value" : "The next ISS pass is %1$@ on %2$@, peaking near %3$lld° altitude."
+          }
+        },
+        "es" : {
+          "stringUnit" : {
+            "state" : "machine_translated",
+            "value" : "El próximo paso de la ISS es %1$@ el %2$@, con un máximo cerca de los %3$lld° de altitud."
+          }
+        }
+      }
+    },
+    "Through the eyepiece" : {
+      "localizations" : {
+        "es" : {
+          "stringUnit" : {
+            "state" : "machine_translated",
+            "value" : "A través del ocular"
+          }
+        }
+      }
+    },
+    "Time" : {
+      "localizations" : {
+        "es" : {
+          "stringUnit" : {
+            "state" : "machine_translated",
+            "value" : "Hora"
+          }
+        }
+      }
+    },
+    "Time offset" : {
+      "localizations" : {
+        "es" : {
+          "stringUnit" : {
+            "state" : "machine_translated",
+            "value" : "Desfase de tiempo"
+          }
+        }
+      }
+    },
+    "Tints the whole interface red to protect your dark adaptation." : {
+      "localizations" : {
+        "es" : {
+          "stringUnit" : {
+            "state" : "machine_translated",
+            "value" : "Tiñe de rojo toda la interfaz para proteger tu adaptación a la oscuridad."
+          }
+        }
+      }
+    },
+    "Today" : {
+      "localizations" : {
+        "es" : {
+          "stringUnit" : {
+            "state" : "machine_translated",
+            "value" : "Hoy"
+          }
+        }
+      }
+    },
+    "Tonight" : {
+      "localizations" : {
+        "es" : {
+          "stringUnit" : {
+            "state" : "machine_translated",
+            "value" : "Esta noche"
+          }
+        }
+      }
+    },
+    "Turn toward %@" : {
+      "localizations" : {
+        "es" : {
+          "stringUnit" : {
+            "state" : "machine_translated",
+            "value" : "Gira hacia %@"
+          }
+        }
+      }
+    },
+    "Up" : {
+      "localizations" : {
+        "es" : {
+          "stringUnit" : {
+            "state" : "machine_translated",
+            "value" : "Visible"
+          }
+        }
+      }
+    },
+    "Up now" : {
+      "localizations" : {
+        "es" : {
+          "stringUnit" : {
+            "state" : "machine_translated",
+            "value" : "Visible ahora"
+          }
+        }
+      }
+    },
+    "Updating orbital elements from Celestrak…" : {
+      "localizations" : {
+        "es" : {
+          "stringUnit" : {
+            "state" : "machine_translated",
+            "value" : "Actualizando elementos orbitales desde Celestrak…"
+          }
+        }
+      }
+    },
+    "Uranus" : {
+      "localizations" : {
+        "es" : {
+          "stringUnit" : {
+            "state" : "machine_translated",
+            "value" : "Urano"
+          }
+        }
+      }
+    },
+    "Use device location" : {
+      "localizations" : {
+        "es" : {
+          "stringUnit" : {
+            "state" : "machine_translated",
+            "value" : "Usar la ubicación del dispositivo"
+          }
+        }
+      }
+    },
+    "Venus" : {
+      "localizations" : {
+        "es" : {
+          "stringUnit" : {
+            "state" : "machine_translated",
+            "value" : "Venus"
+          }
+        }
+      }
+    },
+    "Visible satellite passes · next 24h" : {
+      "localizations" : {
+        "es" : {
+          "stringUnit" : {
+            "state" : "machine_translated",
+            "value" : "Pasos de satélite visibles · próximas 24 h"
+          }
+        }
+      }
+    },
+    "What did you see?" : {
+      "localizations" : {
+        "es" : {
+          "stringUnit" : {
+            "state" : "machine_translated",
+            "value" : "¿Qué has visto?"
+          }
+        }
+      }
+    },
+    "When" : {
+      "localizations" : {
+        "es" : {
+          "stringUnit" : {
+            "state" : "machine_translated",
+            "value" : "Cuándo"
+          }
+        }
+      }
+    },
+    "With each of your eyepieces" : {
+      "localizations" : {
+        "es" : {
+          "stringUnit" : {
+            "state" : "machine_translated",
+            "value" : "Con cada uno de tus oculares"
+          }
+        }
+      }
+    },
+    "Yes — %@ climbs to about %lld° altitude, best around %@." : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "new",
+            "value" : "Yes — %1$@ climbs to about %2$lld° altitude, best around %3$@."
+          }
+        },
+        "es" : {
+          "stringUnit" : {
+            "state" : "machine_translated",
+            "value" : "Sí — %1$@ asciende hasta unos %2$lld° de altitud, mejor hacia las %3$@."
+          }
+        }
+      }
+    }
+  },
+  "version" : "1.3"
+}

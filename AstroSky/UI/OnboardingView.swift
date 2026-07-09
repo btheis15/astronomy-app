@@ -77,12 +77,13 @@ private struct OnboardingPage: View {
     let message: String
     let actionTitle: String
     let action: () async -> Void
+    @ScaledMetric private var heroIconSize: CGFloat = 72
 
     var body: some View {
         VStack(spacing: 24) {
             Spacer()
             Image(systemName: systemImage)
-                .font(.system(size: 72))
+                .font(.system(size: heroIconSize))
                 .foregroundStyle(.indigo)
                 .symbolRenderingMode(.hierarchical)
             Text(title)

@@ -14,6 +14,7 @@ struct ObjectDetailView: View {
     @Environment(\.dismiss) private var dismiss
     let object: any CelestialObject
     @State private var showLogSheet = false
+    @ScaledMetric private var headerIconSize: CGFloat = 34
 
     var body: some View {
         List {
@@ -64,7 +65,7 @@ struct ObjectDetailView: View {
         Section {
             HStack(spacing: 14) {
                 Image(systemName: object.kind.iconSystemName)
-                    .font(.system(size: 34))
+                    .font(.system(size: headerIconSize))
                     .foregroundStyle(.yellow)
                 VStack(alignment: .leading, spacing: 3) {
                     Text(object.name).font(.title3.weight(.semibold))
