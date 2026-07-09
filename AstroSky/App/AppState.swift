@@ -34,6 +34,14 @@ final class AppState {
 
     func resetToLiveTime() { timeOffset = 0 }
 
+    // MARK: Onboarding
+
+    /// True once the first-launch onboarding flow has been completed or skipped.
+    var hasOnboarded: Bool {
+        get { access(keyPath: \.hasOnboarded); return defaults(bool: "hasOnboarded", default: false) }
+        set { withMutation(keyPath: \.hasOnboarded) { UserDefaults.standard.set(newValue, forKey: "hasOnboarded") } }
+    }
+
     // MARK: Selection & navigation
 
     /// Object currently shown in the info card / detail sheet.
@@ -222,7 +230,9 @@ final class AppState {
     // MARK: Lifecycle
 
     func start() {
-        locationService.requestLocation()
+        // On first launch, onboarding requests location in context (page 2);
+        // afterwards request it up front.
+        if hasOnboarded { locationService.requestLocation() }
         Task {
             await satelliteService.start()
             await refreshPassNotifications()
