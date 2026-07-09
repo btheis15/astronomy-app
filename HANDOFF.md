@@ -39,33 +39,46 @@ New epics (fully built):
 - 🔭 **Telescope Guide** — `Core/Optics/*`: optics math, visibility/difficulty, tonight placement, mount guidance, observing tips, equipment library (beginner help + presets); UI: `EquipmentEditorView`, `EyepiecePreviewView`, `TelescopeSection` (in ObjectDetail), `ObserveTonightView` (Catalog). Deep-sky sizes in `Core/Catalog/DeepSkySizes.swift`.
 - 🪐 **Scale AR** — `Core/Models/*` (catalog + scale math) + `AR/ScaleModelBuilder`, `AR/ScaleModelTexture`, `AR/ScaleARView`, `UI/ExploreTabView` (5th "Explore" tab). Real 2K textures in `AstroSky/Textures/` via `Scripts/fetch_textures.sh` (Solar System Scope, CC BY 4.0), procedural fallback.
 
+Session of 2026-07-09 (committed on `feature/world-class-roadmap`, **push pending** — see CI note):
+- **F3** Swift 6 language mode + full strict concurrency. `SWIFT_VERSION` 5→6. Fixes: App Intent static metadata `var`→`let` (`Intents.swift`); `SkySceneBuilder` & `ScaleModelBuilder` marked `@MainActor` (UIKit/RealityKit builders, all callers already main-actor). Build clean, 63/63 tests pass.
+- **E3** iPad & landscape. iPhone orientations now portrait + landscape L/R (`INFOPLIST_KEY_UISupportedInterfaceOrientations_iPhone`); iPad was already all-orientation + `TARGETED_DEVICE_FAMILY=1,2`. `CatalogView` refactored `NavigationStack`→adaptive `NavigationSplitView` (selection-driven sidebar + detail `NavigationStack`; inner drill-downs unchanged). Verified two-column layout on iPad Pro 11" sim.
+- **D6** Spanish (es) localization. Added String Catalogs `Localizable.xcstrings` (201), `AstroSky-InfoPlist.xcstrings` (3), `AppShortcuts.xcstrings` (3) via `LocalizationPlanner`; all 207 strings translated es (0 untranslated). Dynamic Type: text was already semantic; content SF Symbols (object-detail header, onboarding hero) now scale via `@ScaledMetric`. AR HUD glyphs left fixed (fixed geometry).
+
+## DONE this session but NOT yet pushed
+`feature/world-class-roadmap` has 4 new local commits (CI, F3, E3, D6) that **cannot be pushed** until the git token gains `workflow` scope (the branch history contains `.github/workflows/ci.yml`). Recover with:
+```bash
+cd /Users/brian/Desktop/AstroSky
+gh auth refresh -s workflow      # opens browser; approve the device code
+git push origin feature/world-class-roadmap
+```
+Once pushed, CI activation is fully complete (workflow already moved to `.github/workflows/ci.yml`).
+
 ## REMAINING — each needs a one-time Xcode action in **AstroSky.xcodeproj**, then code I can write
+Only the WidgetKit/watchOS/Live-Activity items are left; all three are blocked on creating a target in Xcode (I can't edit `project.pbxproj` without corrupting the open project).
 
 ### 1. D2 — WidgetKit widgets
-- **Xcode:** File ▸ New ▸ Target ▸ **Widget Extension** (name e.g. `AstroSkyWidgets`). Add the shared engine files to the widget target's membership: `Core/Astronomy/*` (AstroTime, Sun, Moon, Coordinates, AstroMath, Nutation, RiseSet), `Core/Satellites/*`, `Core/Location/Coordinates`… (or factor a shared framework).
-- **Build:** 3 widgets — small moon-phase (reuse `MoonPhaseView` drawing), medium "Tonight" (sunset/moonrise/best planet), small "Next ISS pass" (uses `SatelliteService.cachedSatellites()` + `Observer.lastKnown`). Timeline refresh ~4×/day.
+- **Xcode steps to create the target:**
+  1. Open `AstroSky.xcodeproj`. Menu **File ▸ New ▸ Target…**
+  2. Platform **iOS**, choose **Widget Extension**, **Next**.
+  3. Product Name: `AstroSkyWidgets`. **Team**: none needed (Simulator). **Uncheck** "Include Live Activity" for now (add later for E2) — or leave checked if you want the E2 scaffold. **Uncheck** "Include Configuration App Intent" unless you want configurable widgets. **Finish**.
+  4. When prompted **"Activate scheme?"** → **Activate** (creates the widget scheme).
+  5. Select the **project** ▸ target **AstroSkyWidgets** ▸ **General** ▸ confirm Min Deployments matches app (iOS 26).
+  6. **Share the engine with the widget:** for each engine file the widget needs — `Core/Astronomy/*` (AstroTime, Sun, Moon, Coordinates, AstroMath, Nutation, RiseSet, Planets), `Core/Satellites/*` (Satellite, SatelliteService, SGP4, TLE), `Core/Location/*`, `Core/Catalog/SolarSystemObjects` — select the file in the navigator, open the **File Inspector** (right pane, ⌥⌘1), and under **Target Membership** tick **AstroSkyWidgets**. (Cleaner alternative: File ▸ New ▸ Target ▸ **Framework** `AstroKit`, move the engine there, link it to both app + widget — more work but avoids per-file membership drift.)
+  7. If widgets read favorites / last location, add an **App Group** (Signing & Capabilities ▸ + App Groups ▸ `group.com.example.AstroSky`) to both app and widget so they share `UserDefaults`/`Observer.lastKnown`.
+- **Then tell me it's created** and I'll write: small moon-phase widget (reuse `MoonPhaseView` drawing), medium "Tonight" (sunset/moonrise/best planet), small "Next ISS pass" (`SatelliteService.cachedSatellites()` + `Observer.lastKnown`), timelines refreshing ~4×/day.
 
 ### 2. E1 — watchOS companion
-- **Xcode:** File ▸ New ▸ Target ▸ **watchOS App**. Share engine files.
-- **Build:** moon phase + rise/set, "next pass", and "what's up now" (brightest objects up) from shared engine.
+- **Xcode steps:**
+  1. **File ▸ New ▸ Target…** ▸ platform **watchOS** ▸ **App** ▸ **Next**.
+  2. Product Name e.g. `AstroSky Watch`. If offered, choose **"Watch App for iOS App" / companion** so it pairs with AstroSky (bundle id becomes `com.example.AstroSky.watchkitapp`). **Finish** ▸ **Activate** scheme.
+  3. Share the same engine files as D2 via **Target Membership** (or link the `AstroKit` framework if you factored one). Note RealityKit/ARKit/UIKit-only files must NOT be added to the watch target — only the pure-Swift engine (`Core/Astronomy`, `Core/Satellites`, `Core/Location`, relevant `Core/Catalog`).
+- **Then I'll write:** moon phase + rise/set, "next pass", and "what's up now" (brightest objects currently up), all from the shared engine.
 
 ### 3. E2 — Live Activity (satellite pass) — depends on D2
-- Ships inside the widget extension. Start a Live Activity ~30 min before a favorited pass; countdown → live alt/az during → end. Dynamic Island.
+- Ships **inside** the D2 widget extension. In Xcode set **Info ▸ `NSSupportsLiveActivities` = YES** on the app target (Signing & Capabilities may add it), and if you unchecked it in step D2.3, add an `ActivityConfiguration` file to the widget target.
+- **Then I'll write:** start a Live Activity ~30 min before a favorited pass; countdown → live alt/az during → end; Dynamic Island layouts.
 
-### 4. E3 — iPad & landscape
-- **Xcode:** Target ▸ General ▸ Deployment Info → enable iPhone **Landscape Left/Right**.
-- **Code:** `NavigationSplitView` for `CatalogView` on regular width; verify HUD safe-areas in landscape (AR view already fine).
-
-### 5. F3 — Swift 6 strict concurrency
-- **Xcode:** Build Settings ▸ **Swift Language Version = 6**.
-- **Code:** fix diagnostics (watch `SkyRenderer` Timer/Combine callbacks, `LocationService` delegate hops). One known spot already made `nonisolated`: `SatelliteService.groups`.
-
-### 6. D6 — Localization (accessibility already done)
-- **Xcode:** Project ▸ Info ▸ Localizations ▸ **+ Spanish (es)**.
-- **Code:** add `Localizable.xcstrings`, extract user-facing UI strings, provide Spanish. Dynamic Type audit (mostly semantic fonts already).
-
-### 7. CI activation
-- Workflow is at **`ci/ci.yml`**. Move it to **`.github/workflows/ci.yml`** on GitHub (the CLI token lacks `workflow` scope; or run `gh auth refresh -s workflow` locally then push). README badge already added.
+_(E3, F3, D6, and the CI file move are DONE — see the section above and the DONE list.)_
 
 ## Optional / branding
 - Renaming the app "AstroSky" → "AstronomyApp" is a separate task (scheme/product name/bundle id) — doable in the AstroSky project on request. It is NOT required for anything above.
@@ -81,4 +94,4 @@ bash Scripts/fetch_textures.sh   # 12 Solar System Scope 2K maps → AstroSky/Te
 - B2 comets + live JPL SBDB element fetching (v1 uses curated osculating elements for the 3 bright asteroids).
 
 ## First message to paste into the new session
-> This is AstroSky at `~/Desktop/AstroSky/AstroSky.xcodeproj` (GitHub btheis15/astronomy-app). Read `HANDOFF.md` and `ROADMAP.md` in the repo root. I've created the Widget/watchOS targets in this project. Continue with D2/E1/E2 (widgets, watch, Live Activity), then E3/F3/D6. Build with xcodebuild for the iPhone 17 simulator, commit/push as you go, and don't edit project.pbxproj directly.
+> This is AstroSky at `~/Desktop/AstroSky/AstroSky.xcodeproj` (GitHub btheis15/astronomy-app). Read `HANDOFF.md` and `ROADMAP.md` in the repo root. E3/F3/D6 and the CI file move are already done and committed on `feature/world-class-roadmap`. I've now created the `AstroSkyWidgets` (and/or watchOS) target in Xcode — continue with D2/E1/E2 (widgets, watch, Live Activity). Build with `BuildProject` / xcodebuild for the iPhone 17 simulator, commit as you go, and don't edit project.pbxproj directly.
