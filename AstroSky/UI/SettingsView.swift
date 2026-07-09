@@ -56,10 +56,11 @@ struct SettingsView: View {
                     Toggle("Satellites", isOn: $appState.showSatellites)
                     Toggle("Starlink constellation", isOn: $appState.showStarlink)
                         .disabled(!appState.showSatellites)
+                    Toggle("Notify me before passes", isOn: passNotificationBinding)
                 } header: {
                     Text("Satellites")
                 } footer: {
-                    Text("Shows the ISS, Hubble and other naked-eye satellites. The Starlink option adds up to 300 Starlink satellites from live Celestrak data.")
+                    Text("Shows the ISS, Hubble and other naked-eye satellites. The Starlink option adds up to 300 Starlink satellites from live Celestrak data. Star a satellite in the Catalog to get a heads-up 10 minutes before its visible passes.")
                 }
 
                 Section {
@@ -84,6 +85,20 @@ struct SettingsView: View {
             }
             .navigationTitle("Settings")
         }
+    }
+
+    /// Enabling requests notification authorization, then (re)schedules.
+    private var passNotificationBinding: Binding<Bool> {
+        Binding(
+            get: { appState.passNotificationsEnabled },
+            set: { newValue in
+                appState.passNotificationsEnabled = newValue
+                Task {
+                    if newValue { _ = await appState.notificationScheduler.requestAuthorization() }
+                    await appState.refreshPassNotifications()
+                }
+            }
+        )
     }
 
     private var locationSection: some View {

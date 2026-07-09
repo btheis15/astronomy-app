@@ -18,6 +18,7 @@ final class AppState {
     let catalog = SkyCatalog()
     let satelliteService = SatelliteService()
     let locationService = LocationService()
+    let notificationScheduler = PassNotificationScheduler()
 
     var observer: Observer { locationService.observer }
 
@@ -172,10 +173,59 @@ final class AppState {
         return UserDefaults.standard.bool(forKey: key)
     }
 
+    // MARK: Satellite favorites & pass notifications
+
+    var favoriteSatelliteIDs: Set<String> {
+        get {
+            access(keyPath: \.favoriteSatelliteIDs)
+            let stored = UserDefaults.standard.stringArray(forKey: "favoriteSatelliteIDs") ?? []
+            return Set(stored)
+        }
+        set {
+            withMutation(keyPath: \.favoriteSatelliteIDs) {
+                UserDefaults.standard.set(Array(newValue), forKey: "favoriteSatelliteIDs")
+            }
+        }
+    }
+
+    func isFavoriteSatellite(_ id: String) -> Bool { favoriteSatelliteIDs.contains(id) }
+
+    func toggleFavoriteSatellite(_ id: String) {
+        var favorites = favoriteSatelliteIDs
+        if favorites.contains(id) { favorites.remove(id) } else { favorites.insert(id) }
+        favoriteSatelliteIDs = favorites
+        Task { await refreshPassNotifications() }
+    }
+
+    var passNotificationsEnabled: Bool {
+        get { access(keyPath: \.passNotificationsEnabled); return defaults(bool: "passNotificationsEnabled", default: false) }
+        set { withMutation(keyPath: \.passNotificationsEnabled) { UserDefaults.standard.set(newValue, forKey: "passNotificationsEnabled") } }
+    }
+
+    /// Recompute upcoming visible passes for favorited satellites and schedule
+    /// (or clear) their pre-pass notifications.
+    func refreshPassNotifications() async {
+        guard passNotificationsEnabled, !favoriteSatelliteIDs.isEmpty else {
+            notificationScheduler.cancelAll()
+            return
+        }
+        let observer = observer
+        let favorites = favoriteSatelliteIDs.compactMap { satelliteService.satellite(withID: $0) }
+        let passes = await Task.detached(priority: .utility) {
+            favorites.flatMap {
+                $0.passes(observer: observer, startingAt: Date(), hours: 24)
+            }.filter(\.isVisible)
+        }.value
+        await notificationScheduler.reschedule(passes: passes)
+    }
+
     // MARK: Lifecycle
 
     func start() {
         locationService.requestLocation()
-        Task { await satelliteService.start() }
+        Task {
+            await satelliteService.start()
+            await refreshPassNotifications()
+        }
     }
 }

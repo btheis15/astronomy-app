@@ -148,6 +148,16 @@ struct CatalogRow: View {
                 Text(object.subtitle).font(.caption).foregroundStyle(.secondary)
             }
             Spacer()
+            if object.kind == .satellite {
+                Button {
+                    appState.toggleFavoriteSatellite(object.id)
+                } label: {
+                    Image(systemName: appState.isFavoriteSatellite(object.id) ? "star.fill" : "star")
+                        .foregroundStyle(appState.isFavoriteSatellite(object.id) ? .yellow : .secondary)
+                }
+                .buttonStyle(.plain)
+                .padding(.trailing, 4)
+            }
             VStack(alignment: .trailing, spacing: 2) {
                 if let magnitude = object.magnitude {
                     Text("mag \(AstroFormat.magnitude(magnitude))")

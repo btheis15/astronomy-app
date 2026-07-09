@@ -5,6 +5,7 @@
 
 import Foundation
 import Testing
+import UserNotifications
 @testable import AstroSky
 
 /// The classic ISS reference TLE (2008-09-20 epoch) with valid checksums.
@@ -160,6 +161,38 @@ struct SatelliteGeometryTests {
         // …one directly behind the Earth at LEO altitude is in shadow.
         let nightside = sunDir * -7_000.0
         #expect(!Satellite.isSunlit(temePosition: nightside, julianDate: jd))
+    }
+}
+
+struct PassNotificationTests {
+    private let now = Date(timeIntervalSince1970: 1_800_000_000)
+
+    private func pass(startOffset: TimeInterval, visible: Bool, id: String = "sat.25544") -> SatellitePass {
+        SatellitePass(satelliteID: id, satelliteName: "ISS",
+                      start: now.addingTimeInterval(startOffset),
+                      peak: now.addingTimeInterval(startOffset + 60),
+                      end: now.addingTimeInterval(startOffset + 120),
+                      maxAltitude: 1.0, isVisible: visible, peakMagnitude: -2.0)
+    }
+
+    @Test func schedulesForFavoritedPassElevenMinutesAway() {
+        let requests = PassNotifications.requests(for: [pass(startOffset: 11 * 60, visible: true)], now: now)
+        #expect(requests.count == 1)
+        let trigger = requests.first?.trigger as? UNTimeIntervalNotificationTrigger
+        // Fires ~1 minute from now (11 min start − 10 min lead time).
+        #expect(trigger != nil)
+        #expect((trigger?.timeInterval ?? 0) > 30 && (trigger?.timeInterval ?? 0) < 120)
+    }
+
+    @Test func skipsPastAndInvisiblePasses() {
+        let past = pass(startOffset: 60, visible: true)          // fire time already elapsed
+        let invisible = pass(startOffset: 3600, visible: false, id: "sat.999")
+        #expect(PassNotifications.requests(for: [past, invisible], now: now).isEmpty)
+    }
+
+    @Test func capsPendingCount() {
+        let many = (0..<40).map { pass(startOffset: Double(700 + $0 * 600), visible: true, id: "sat.\($0)") }
+        #expect(PassNotifications.requests(for: many, now: now).count <= PassNotifications.maxPending)
     }
 }
 
