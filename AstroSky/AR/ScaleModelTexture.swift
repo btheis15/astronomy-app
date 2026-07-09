@@ -30,9 +30,11 @@ enum ScaleModelTexture {
     private static func bundledImage(named key: String) -> CGImage? {
         if let image = UIImage(named: key)?.cgImage { return image }
         for ext in ["jpg", "png"] {
-            if let url = Bundle.main.url(forResource: key, withExtension: ext),
-               let image = UIImage(contentsOfFile: url.path)?.cgImage {
-                return image
+            for subdir in [nil, "Textures"] as [String?] {
+                if let url = Bundle.main.url(forResource: key, withExtension: ext, subdirectory: subdir),
+                   let image = UIImage(contentsOfFile: url.path)?.cgImage {
+                    return image
+                }
             }
         }
         return nil
