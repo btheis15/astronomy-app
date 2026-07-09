@@ -110,10 +110,18 @@ struct LogObservationSheet: View {
                     LabeledContent("Moon", value: MoonEphemeris.phase(julianDate: appState.skyJulianDate).phaseName)
                 }
                 Section("Seeing") {
-                    Picker("Rating", selection: $seeing) {
-                        ForEach(1...5, id: \.self) { Text(String(repeating: "★", count: $0)).tag($0) }
+                    HStack(spacing: 8) {
+                        ForEach(1...5, id: \.self) { value in
+                            Image(systemName: value <= seeing ? "star.fill" : "star")
+                                .font(.title3)
+                                .foregroundStyle(value <= seeing ? .yellow : .secondary)
+                                .frame(maxWidth: .infinity)
+                                .contentShape(Rectangle())
+                                .onTapGesture { seeing = value }
+                                .accessibilityLabel("\(value) star\(value == 1 ? "" : "s")")
+                                .accessibilityAddTraits(value == seeing ? .isSelected : [])
+                        }
                     }
-                    .pickerStyle(.segmented)
                 }
                 Section("Notes") {
                     TextField("What did you see?", text: $notes, axis: .vertical)

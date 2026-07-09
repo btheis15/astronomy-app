@@ -139,8 +139,10 @@ struct SkyTabView: View {
                 ?? String(format: "%.1f°, %.1f°",
                           appState.observer.latitudeDegrees,
                           appState.observer.longitudeDegrees))
+                .lineLimit(1)
         }
         .font(.footnote)
+        .fixedSize(horizontal: true, vertical: false)
         .padding(.horizontal, 10)
         .padding(.vertical, 6)
         .background(.ultraThinMaterial, in: Capsule())

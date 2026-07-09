@@ -230,28 +230,96 @@ struct ConstellationListView: View {
 
     var body: some View {
         List(ConstellationCatalog.constellations) { constellation in
-            HStack {
-                Image(systemName: "point.3.connected.trianglepath.dotted")
-                    .foregroundStyle(.indigo)
-                    .frame(width: 28)
-                VStack(alignment: .leading, spacing: 2) {
-                    Text(constellation.name)
-                    Text("\(constellation.starPairs.count) figure lines · \(constellation.abbreviation)")
-                        .font(.caption)
-                        .foregroundStyle(.secondary)
+            NavigationLink {
+                ConstellationDetailView(constellation: constellation)
+            } label: {
+                HStack {
+                    Image(systemName: "point.3.connected.trianglepath.dotted")
+                        .foregroundStyle(.indigo)
+                        .frame(width: 28)
+                    VStack(alignment: .leading, spacing: 2) {
+                        Text(constellation.name)
+                        Text("\(constellation.starPairs.count) figure lines · \(constellation.abbreviation)")
+                            .font(.caption)
+                            .foregroundStyle(.secondary)
+                    }
+                    Spacer()
+                    if let center = constellation.centerJ2000 {
+                        let horizontal = CoordinateTransforms.horizontal(
+                            of: CoordinateTransforms.precessFromJ2000(center, julianDate: appState.skyJulianDate),
+                            julianDate: appState.skyJulianDate,
+                            observer: appState.observer)
+                        Circle()
+                            .fill(horizontal.isAboveHorizon ? Color.green : Color.gray.opacity(0.4))
+                            .frame(width: 8, height: 8)
+                    }
                 }
-                Spacer()
+            }
+        }
+        .navigationTitle("Constellations")
+    }
+}
+
+/// Facts about a constellation plus its member stars. Constellations aren't
+/// `CelestialObject`s themselves, so drill-down and "Find in AR" reuse the
+/// figure's stars, which are.
+struct ConstellationDetailView: View {
+    @Environment(AppState.self) private var appState
+    let constellation: Constellation
+
+    /// Unique member stars of the stick figure, brightest first.
+    private var memberStars: [Star] {
+        var seen = Set<String>()
+        return constellation.starPairs
+            .flatMap { [$0.0, $0.1] }
+            .filter { seen.insert($0.id).inserted }
+            .sorted { $0.visualMagnitude < $1.visualMagnitude }
+    }
+
+    var body: some View {
+        List {
+            Section {
                 if let center = constellation.centerJ2000 {
                     let horizontal = CoordinateTransforms.horizontal(
                         of: CoordinateTransforms.precessFromJ2000(center, julianDate: appState.skyJulianDate),
                         julianDate: appState.skyJulianDate,
                         observer: appState.observer)
-                    Circle()
-                        .fill(horizontal.isAboveHorizon ? Color.green : Color.gray.opacity(0.4))
-                        .frame(width: 8, height: 8)
+                    HStack {
+                        Label(horizontal.isAboveHorizon ? "Up now" : "Below horizon",
+                              systemImage: horizontal.isAboveHorizon ? "eye" : "eye.slash")
+                            .foregroundStyle(horizontal.isAboveHorizon ? .green : .secondary)
+                        Spacer()
+                        Text("\(AstroFormat.degrees(horizontal.altitude)) · \(horizontal.compassDirection)")
+                            .foregroundStyle(.secondary)
+                    }
+                    .font(.subheadline)
+                }
+                if let brightest = memberStars.first {
+                    Button {
+                        appState.select(brightest)
+                        appState.guideTargetID = brightest.id
+                        appState.skyTabRequested = true
+                    } label: {
+                        Label("Find in AR", systemImage: "location.viewfinder")
+                    }
+                }
+            } header: {
+                Text("\(constellation.starPairs.count) figure lines · \(constellation.abbreviation)")
+            }
+
+            if !memberStars.isEmpty {
+                Section("Stars in this figure") {
+                    ForEach(memberStars, id: \.id) { star in
+                        NavigationLink {
+                            ObjectDetailView(object: star)
+                        } label: {
+                            CatalogRow(object: star)
+                        }
+                    }
                 }
             }
         }
-        .navigationTitle("Constellations")
+        .navigationTitle(constellation.name)
+        .navigationBarTitleDisplayMode(.inline)
     }
 }

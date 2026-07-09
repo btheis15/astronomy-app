@@ -249,8 +249,28 @@ struct TonightView: View {
             }
             return all.filter(\.isVisible).sorted { $0.start < $1.start }
         }.value
-        passes = computed
+        passes = Self.deduplicated(computed)
         passesLoaded = true
+    }
+
+    /// Collapse near-simultaneous passes of the same-named satellite. The three
+    /// CSS station modules (Tianhe/Wentian/Mengtian) fly together and are
+    /// distinct NORAD objects, so they would otherwise list as three identical
+    /// "CSS" passes. Keeps the highest-altitude of each overlapping group.
+    private static func deduplicated(_ passes: [SatellitePass]) -> [SatellitePass] {
+        var kept: [SatellitePass] = []
+        for pass in passes {
+            if let index = kept.firstIndex(where: {
+                $0.satelliteName == pass.satelliteName
+                    && pass.start <= $0.end.addingTimeInterval(60)
+                    && $0.start <= pass.end.addingTimeInterval(60)
+            }) {
+                if pass.maxAltitude > kept[index].maxAltitude { kept[index] = pass }
+            } else {
+                kept.append(pass)
+            }
+        }
+        return kept
     }
 
     private func row(_ label: String, _ value: String, icon: String) -> some View {

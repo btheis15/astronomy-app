@@ -83,6 +83,10 @@ struct ObserveTonightView: View {
         candidates.append(contentsOf: appState.catalog.minorBodies.map { $0 as any CelestialObject })
         candidates.append(contentsOf: appState.catalog.deepSky.map { $0 as any CelestialObject })
         candidates.removeAll { $0.kind == .sun }   // never a night target
+        // Some objects appear in more than one catalog (e.g. Caldwell 20 is the
+        // same North America Nebula as NGC 7000); show each physical object once.
+        var seenNames = Set<String>()
+        candidates = candidates.filter { seenNames.insert($0.name.lowercased()).inserted }
 
         let jd = appState.skyJulianDate
         var result: [Target] = []
