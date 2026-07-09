@@ -8,91 +8,64 @@
 
 import SwiftUI
 
+/// Top-level catalog destinations. Hashable so the sidebar can drive an
+/// adaptive `NavigationSplitView` selection (two columns on iPad / landscape,
+/// collapsing to a push navigation on iPhone portrait). Favorites are keyed by
+/// object id and resolved from `AppState` when shown.
+enum CatalogSelection: Hashable {
+    case favorite(String)
+    case observingLog, orrery, observeTonight
+    case solarSystem, brightStars, messier, caldwell, ngc, constellations
+    case featuredSatellites, starlink
+}
+
 struct CatalogView: View {
     @Environment(AppState.self) private var appState
+    @State private var selection: CatalogSelection?
 
     var body: some View {
-        NavigationStack {
-            List {
+        NavigationSplitView {
+            List(selection: $selection) {
                 if !appState.favoriteObjects.isEmpty {
                     Section("Favorites") {
                         ForEach(appState.favoriteObjects, id: \.id) { object in
-                            NavigationLink {
-                                ObjectDetailView(object: object)
-                            } label: {
-                                CatalogRow(object: object)
-                            }
+                            CatalogRow(object: object)
+                                .tag(CatalogSelection.favorite(object.id))
                         }
                     }
                 }
 
                 Section {
-                    NavigationLink {
-                        ObservationLogView()
-                    } label: {
-                        Label("Observing Log", systemImage: "book.closed")
-                    }
-                    NavigationLink {
-                        OrreryView()
-                    } label: {
-                        Label("Solar System Orrery", systemImage: "circle.hexagongrid.fill")
-                    }
-                    NavigationLink {
-                        ObserveTonightView()
-                    } label: {
-                        Label("Observe Tonight · your telescope", systemImage: "eyeglasses")
-                    }
+                    Label("Observing Log", systemImage: "book.closed")
+                        .tag(CatalogSelection.observingLog)
+                    Label("Solar System Orrery", systemImage: "circle.hexagongrid.fill")
+                        .tag(CatalogSelection.orrery)
+                    Label("Observe Tonight · your telescope", systemImage: "eyeglasses")
+                        .tag(CatalogSelection.observeTonight)
                 }
 
                 Section {
-                    NavigationLink {
-                        ObjectListView(title: "Solar System", objects: solarSystemObjects)
-                    } label: {
-                        Label("Solar System", systemImage: "sun.max.fill")
-                    }
-                    NavigationLink {
-                        ObjectListView(title: "Bright Stars",
-                                       objects: appState.catalog.stars.prefix(300).map { $0 })
-                    } label: {
-                        Label("Bright Stars", systemImage: "star.fill")
-                    }
-                    NavigationLink {
-                        ObjectListView(title: "Messier Objects", objects: MessierCatalog.objects)
-                    } label: {
-                        Label("Messier Objects", systemImage: "sparkles")
-                    }
-                    NavigationLink {
-                        ObjectListView(title: "Caldwell Objects", objects: CaldwellCatalog.objects)
-                    } label: {
-                        Label("Caldwell Objects", systemImage: "sparkles")
-                    }
-                    NavigationLink {
-                        ObjectListView(title: "NGC Highlights", objects: NGCHighlights.objects)
-                    } label: {
-                        Label("NGC Highlights", systemImage: "sparkles")
-                    }
-                    NavigationLink {
-                        ConstellationListView()
-                    } label: {
-                        Label("Constellations", systemImage: "point.3.connected.trianglepath.dotted")
-                    }
+                    Label("Solar System", systemImage: "sun.max.fill")
+                        .tag(CatalogSelection.solarSystem)
+                    Label("Bright Stars", systemImage: "star.fill")
+                        .tag(CatalogSelection.brightStars)
+                    Label("Messier Objects", systemImage: "sparkles")
+                        .tag(CatalogSelection.messier)
+                    Label("Caldwell Objects", systemImage: "sparkles")
+                        .tag(CatalogSelection.caldwell)
+                    Label("NGC Highlights", systemImage: "sparkles")
+                        .tag(CatalogSelection.ngc)
+                    Label("Constellations", systemImage: "point.3.connected.trianglepath.dotted")
+                        .tag(CatalogSelection.constellations)
                 } header: {
                     Text("Catalog")
                 }
 
                 Section {
-                    NavigationLink {
-                        ObjectListView(title: "Featured Satellites",
-                                       objects: appState.satelliteService.featured)
-                    } label: {
-                        Label("Featured Satellites", systemImage: "antenna.radiowaves.left.and.right")
-                    }
-                    NavigationLink {
-                        ObjectListView(title: "Starlink",
-                                       objects: appState.satelliteService.starlinkForDisplay)
-                    } label: {
-                        Label("Starlink", systemImage: "wifi")
-                    }
+                    Label("Featured Satellites", systemImage: "antenna.radiowaves.left.and.right")
+                        .tag(CatalogSelection.featuredSatellites)
+                    Label("Starlink", systemImage: "wifi")
+                        .tag(CatalogSelection.starlink)
                 } header: {
                     Text("Satellites")
                 } footer: {
@@ -100,7 +73,55 @@ struct CatalogView: View {
                 }
             }
             .navigationTitle("Catalog")
+        } detail: {
+            NavigationStack {
+                detailView
+            }
+            .id(selection)
         }
+    }
+
+    /// Root content for the selected section. Inner views keep their own
+    /// view-based `NavigationLink`s, which push within this detail stack.
+    @ViewBuilder
+    private var detailView: some View {
+        switch selection {
+        case .favorite(let id):
+            if let object = appState.favoriteObjects.first(where: { $0.id == id }) {
+                ObjectDetailView(object: object)
+            } else {
+                catalogPlaceholder
+            }
+        case .observingLog: ObservationLogView()
+        case .orrery: OrreryView()
+        case .observeTonight: ObserveTonightView()
+        case .solarSystem:
+            ObjectListView(title: "Solar System", objects: solarSystemObjects)
+        case .brightStars:
+            ObjectListView(title: "Bright Stars",
+                           objects: appState.catalog.stars.prefix(300).map { $0 })
+        case .messier:
+            ObjectListView(title: "Messier Objects", objects: MessierCatalog.objects)
+        case .caldwell:
+            ObjectListView(title: "Caldwell Objects", objects: CaldwellCatalog.objects)
+        case .ngc:
+            ObjectListView(title: "NGC Highlights", objects: NGCHighlights.objects)
+        case .constellations: ConstellationListView()
+        case .featuredSatellites:
+            ObjectListView(title: "Featured Satellites",
+                           objects: appState.satelliteService.featured)
+        case .starlink:
+            ObjectListView(title: "Starlink",
+                           objects: appState.satelliteService.starlinkForDisplay)
+        case nil:
+            catalogPlaceholder
+        }
+    }
+
+    private var catalogPlaceholder: some View {
+        ContentUnavailableView("Select an item",
+                               systemImage: "sparkles",
+                               description: Text("Browse the sky catalog, your telescope targets and live satellites."))
     }
 
     private var solarSystemObjects: [any CelestialObject] {
