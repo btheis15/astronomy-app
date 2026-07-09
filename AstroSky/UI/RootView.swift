@@ -1,0 +1,61 @@
+//
+//  RootView.swift
+//  AstroSky
+//
+
+import SwiftUI
+
+struct RootView: View {
+    @Environment(AppState.self) private var appState
+    @State private var selectedTab: Tab = .sky
+
+    enum Tab: Hashable {
+        case sky, tonight, catalog, settings
+    }
+
+    var body: some View {
+        TabView(selection: $selectedTab) {
+            SkyTabView()
+                .tabItem { Label("Sky", systemImage: "sparkles.rectangle.stack") }
+                .tag(Tab.sky)
+
+            TonightView()
+                .tabItem { Label("Tonight", systemImage: "moon.stars") }
+                .tag(Tab.tonight)
+
+            CatalogView()
+                .tabItem { Label("Catalog", systemImage: "list.star") }
+                .tag(Tab.catalog)
+
+            SettingsView()
+                .tabItem { Label("Settings", systemImage: "gearshape") }
+                .tag(Tab.settings)
+        }
+        .tint(appState.nightMode ? .red : .indigo)
+        .onChange(of: appState.skyTabRequested) { _, requested in
+            if requested {
+                selectedTab = .sky
+                appState.skyTabRequested = false
+            }
+        }
+        .overlay {
+            if appState.nightMode {
+                NightModeOverlay()
+            }
+        }
+    }
+}
+
+/// Red-tint overlay that preserves dark adaptation. Purely visual — it
+/// multiplies everything underneath toward red and never intercepts touches.
+struct NightModeOverlay: View {
+    var body: some View {
+        Rectangle()
+            .fill(Color.red)
+            .opacity(0.45)
+            .blendMode(.multiply)
+            .ignoresSafeArea()
+            .allowsHitTesting(false)
+            .accessibilityHidden(true)
+    }
+}
