@@ -57,6 +57,7 @@ final class LocationService: NSObject, CLLocationManagerDelegate {
         hasRealLocation = true
         observer = Observer(latitudeDegrees: latitudeDegrees, longitudeDegrees: longitudeDegrees)
         placeName = name ?? String(format: "%.2f°, %.2f°", latitudeDegrees, longitudeDegrees)
+        Observer.persistLastKnown(observer)
     }
 
     func useAutomaticLocation() {
@@ -85,6 +86,7 @@ final class LocationService: NSObject, CLLocationManagerDelegate {
                                      longitudeDegrees: location.coordinate.longitude,
                                      altitude: location.altitude)
             self.hasRealLocation = true
+            Observer.persistLastKnown(self.observer)
             await self.reverseGeocode(location)
         }
     }

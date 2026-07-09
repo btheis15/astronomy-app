@@ -22,7 +22,7 @@ final class SatelliteService {
 
     /// Celestrak groups the app tracks. "visual" is the list of naked-eye
     /// satellites (ISS, Hubble, Tiangong, bright rocket bodies…).
-    static let groups = ["stations", "visual", "starlink"]
+    nonisolated static let groups = ["stations", "visual", "starlink"]
 
     /// Refetch interval — TLEs go stale after a day or two.
     static let refreshInterval: TimeInterval = 6 * 3600
@@ -144,6 +144,27 @@ final class SatelliteService {
         let base = FileManager.default.urls(for: .applicationSupportDirectory, in: .userDomainMask)[0]
         try? FileManager.default.createDirectory(at: base, withIntermediateDirectories: true)
         return base.appendingPathComponent("tle-cache.json")
+    }
+
+    /// Synchronously build satellites from the on-disk TLE cache. Used by
+    /// App Intents, which run without the live service. Empty if never fetched.
+    nonisolated static func cachedSatellites() -> [Satellite] {
+        guard let data = try? Data(contentsOf: cacheURL),
+              let payload = try? JSONDecoder().decode(CachePayload.self, from: data) else {
+            return []
+        }
+        var seen = Set<Int>()
+        var result: [Satellite] = []
+        for group in groups {
+            guard let text = payload.sets[group] else { continue }
+            for tle in TLEParser.parse(text: text) where !seen.contains(tle.catalogNumber) {
+                if let satellite = Satellite(tle: tle, group: group) {
+                    seen.insert(tle.catalogNumber)
+                    result.append(satellite)
+                }
+            }
+        }
+        return result
     }
 
     private func loadFromCache() -> (date: Date, sets: [String: String])? {

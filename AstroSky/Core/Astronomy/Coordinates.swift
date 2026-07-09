@@ -89,6 +89,20 @@ struct Observer: Equatable, Sendable {
 
     /// Greenwich, a neutral default before location authorization resolves.
     static let `default` = Observer(latitudeDegrees: 51.4779, longitudeDegrees: 0.0)
+
+    /// Persist the observer so out-of-process consumers (App Intents) can use
+    /// the user's real location.
+    static func persistLastKnown(_ observer: Observer) {
+        UserDefaults.standard.set(observer.latitudeDegrees, forKey: "lastLatitude")
+        UserDefaults.standard.set(observer.longitudeDegrees, forKey: "lastLongitude")
+    }
+
+    /// The last persisted observer, or Greenwich if none has been stored.
+    static var lastKnown: Observer {
+        guard UserDefaults.standard.object(forKey: "lastLatitude") != nil else { return .default }
+        return Observer(latitudeDegrees: UserDefaults.standard.double(forKey: "lastLatitude"),
+                        longitudeDegrees: UserDefaults.standard.double(forKey: "lastLongitude"))
+    }
 }
 
 // MARK: - Transformations
