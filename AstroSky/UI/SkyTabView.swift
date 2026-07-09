@@ -1,0 +1,255 @@
+//
+//  SkyTabView.swift
+//  AstroSky
+//
+//  The AR sky: camera passthrough with the celestial overlay, plus HUD
+//  controls (search, time travel, mode switch, object card, guidance arrow).
+//
+
+import ARKit
+import SwiftUI
+
+struct SkyTabView: View {
+    @Environment(AppState.self) private var appState
+    @State private var guide: GuideReadout?
+    @State private var preferManualMode = !ARWorldTrackingConfiguration.isSupported
+    @State private var showSearch = false
+    @State private var showTimeControls = false
+
+    var body: some View {
+        ZStack {
+            SkyARViewContainer(appState: appState,
+                               preferManualMode: preferManualMode) { readout in
+                guide = readout
+            }
+            .id(preferManualMode)   // rebuild the view when switching modes
+            .ignoresSafeArea()
+
+            hud
+        }
+    }
+
+    private var hud: some View {
+        VStack(spacing: 0) {
+            topBar
+            Spacer()
+
+            if let guide, appState.guideTargetID != nil {
+                GuideArrowView(guide: guide) {
+                    appState.guideTargetID = nil
+                }
+                .padding(.bottom, 10)
+            }
+
+            if !appState.isLiveTime || showTimeControls {
+                TimeControlBar(isExpanded: $showTimeControls)
+                    .padding(.horizontal)
+                    .padding(.bottom, 8)
+            }
+
+            if let selected = appState.selectedObject {
+                ObjectCardView(object: selected)
+                    .padding(.horizontal)
+                    .padding(.bottom, 8)
+                    .transition(.move(edge: .bottom).combined(with: .opacity))
+            }
+        }
+        .animation(.snappy, value: appState.selectedObjectID)
+        .sheet(isPresented: $showSearch) {
+            SearchView()
+        }
+    }
+
+    private var topBar: some View {
+        HStack(spacing: 12) {
+            locationBadge
+
+            Spacer()
+
+            if !appState.isLiveTime {
+                Button {
+                    appState.resetToLiveTime()
+                } label: {
+                    Label("Live", systemImage: "clock.arrow.circlepath")
+                        .font(.footnote.weight(.semibold))
+                }
+                .buttonStyle(.borderedProminent)
+                .tint(.orange)
+            }
+
+            hudButton(systemImage: "clock") {
+                showTimeControls.toggle()
+            }
+            hudButton(systemImage: preferManualMode ? "arkit" : "hand.draw") {
+                preferManualMode.toggle()
+            }
+            hudButton(systemImage: "magnifyingglass") {
+                showSearch = true
+            }
+        }
+        .padding(.horizontal)
+        .padding(.top, 4)
+    }
+
+    private var locationBadge: some View {
+        HStack(spacing: 6) {
+            Image(systemName: appState.locationService.hasRealLocation
+                ? "location.fill" : "location.slash")
+            Text(appState.locationService.placeName
+                ?? String(format: "%.1f°, %.1f°",
+                          appState.observer.latitudeDegrees,
+                          appState.observer.longitudeDegrees))
+        }
+        .font(.footnote)
+        .padding(.horizontal, 10)
+        .padding(.vertical, 6)
+        .background(.ultraThinMaterial, in: Capsule())
+    }
+
+    private func hudButton(systemImage: String, action: @escaping () -> Void) -> some View {
+        Button(action: action) {
+            Image(systemName: systemImage)
+                .font(.system(size: 17, weight: .medium))
+                .frame(width: 40, height: 40)
+                .background(.ultraThinMaterial, in: Circle())
+        }
+        .buttonStyle(.plain)
+    }
+}
+
+// MARK: - Guidance arrow
+
+struct GuideArrowView: View {
+    let guide: GuideReadout
+    let onDismiss: () -> Void
+
+    var body: some View {
+        VStack(spacing: 6) {
+            if guide.isOnTarget {
+                Label("On target: \(guide.targetName)", systemImage: "scope")
+                    .font(.subheadline.weight(.semibold))
+            } else {
+                Image(systemName: "arrow.right")
+                    .font(.system(size: 34, weight: .bold))
+                    // Screen angle: 0 = right, π/2 = up; SwiftUI rotation is
+                    // clockwise, so negate.
+                    .rotationEffect(.radians(-guide.arrowAngle))
+                Text(guide.isBelowHorizon
+                    ? "\(guide.targetName) is below the horizon"
+                    : "Turn toward \(guide.targetName)")
+                    .font(.footnote)
+            }
+            Button("Stop guiding", action: onDismiss)
+                .font(.caption)
+        }
+        .padding(12)
+        .background(.ultraThinMaterial, in: RoundedRectangle(cornerRadius: 14))
+        .foregroundStyle(guide.isOnTarget ? .green : .primary)
+    }
+}
+
+// MARK: - Time travel
+
+struct TimeControlBar: View {
+    @Environment(AppState.self) private var appState
+    @Binding var isExpanded: Bool
+
+    var body: some View {
+        @Bindable var appState = appState
+        VStack(spacing: 8) {
+            HStack {
+                Text(appState.skyDate.formatted(date: .abbreviated, time: .shortened))
+                    .font(.footnote.monospacedDigit().weight(.medium))
+                Spacer()
+                Button {
+                    appState.resetToLiveTime()
+                    isExpanded = false
+                } label: {
+                    Image(systemName: "xmark.circle.fill")
+                }
+                .buttonStyle(.plain)
+            }
+
+            Slider(value: $appState.timeOffset, in: -43_200...43_200, step: 300) {
+                Text("Time offset")
+            } minimumValueLabel: {
+                Text("−12h").font(.caption2)
+            } maximumValueLabel: {
+                Text("+12h").font(.caption2)
+            }
+
+            HStack(spacing: 10) {
+                timeJumpButton("−1d", seconds: -86_400)
+                timeJumpButton("−1h", seconds: -3600)
+                timeJumpButton("+1h", seconds: 3600)
+                timeJumpButton("+1d", seconds: 86_400)
+            }
+        }
+        .padding(12)
+        .background(.ultraThinMaterial, in: RoundedRectangle(cornerRadius: 14))
+    }
+
+    private func timeJumpButton(_ label: String, seconds: TimeInterval) -> some View {
+        Button(label) {
+            appState.timeOffset += seconds
+        }
+        .font(.caption.weight(.semibold))
+        .buttonStyle(.bordered)
+    }
+}
+
+// MARK: - Selected object card
+
+struct ObjectCardView: View {
+    @Environment(AppState.self) private var appState
+    let object: any CelestialObject
+    @State private var showDetail = false
+
+    var body: some View {
+        let position = object.skyPosition(julianDate: appState.skyJulianDate,
+                                          observer: appState.observer)
+        HStack(spacing: 12) {
+            Image(systemName: object.kind.iconSystemName)
+                .font(.title2)
+                .foregroundStyle(.yellow)
+                .frame(width: 40)
+
+            VStack(alignment: .leading, spacing: 2) {
+                Text(object.name).font(.headline)
+                Text(object.subtitle).font(.caption).foregroundStyle(.secondary)
+                HStack(spacing: 10) {
+                    Label(AstroFormat.degrees(position.horizontal.altitude), systemImage: "arrow.up.and.down")
+                    Label(AstroFormat.azimuth(position.horizontal), systemImage: "safari")
+                    if let magnitude = object.magnitude {
+                        Label(AstroFormat.magnitude(magnitude), systemImage: "sun.max")
+                    }
+                }
+                .font(.caption2)
+                .foregroundStyle(.secondary)
+            }
+
+            Spacer()
+
+            VStack(spacing: 8) {
+                Button {
+                    showDetail = true
+                } label: {
+                    Image(systemName: "info.circle").font(.title3)
+                }
+                Button {
+                    appState.select(nil)
+                } label: {
+                    Image(systemName: "xmark.circle").font(.title3)
+                }
+            }
+            .buttonStyle(.plain)
+        }
+        .padding(12)
+        .background(.ultraThinMaterial, in: RoundedRectangle(cornerRadius: 16))
+        .sheet(isPresented: $showDetail) {
+            NavigationStack {
+                ObjectDetailView(object: object)
+            }
+        }
+    }
+}
