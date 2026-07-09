@@ -1,0 +1,51 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  build-and-test:
+    name: Build & Test
+    runs-on: macos-15
+    env:
+      SCHEME: AstroSky
+      PROJECT: AstroSky.xcodeproj
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Select latest Xcode
+        run: sudo xcode-select -switch /Applications/Xcode.app
+
+      - name: Cache DerivedData
+        uses: actions/cache@v4
+        with:
+          path: ~/Library/Developer/Xcode/DerivedData
+          key: deriveddata-${{ runner.os }}-${{ hashFiles('**/*.pbxproj') }}
+          restore-keys: |
+            deriveddata-${{ runner.os }}-
+
+      - name: Pick an iOS Simulator
+        id: sim
+        run: |
+          DEVICE=$(xcrun simctl list devices available | grep -oE 'iPhone [0-9]+( Pro)?' | head -1)
+          echo "device=${DEVICE:-iPhone 16}" >> "$GITHUB_OUTPUT"
+
+      - name: Build
+        run: |
+          xcodebuild -project "$PROJECT" -scheme "$SCHEME" \
+            -destination "generic/platform=iOS Simulator" \
+            build | xcbeautify || true
+
+      - name: Test
+        run: |
+          xcodebuild -project "$PROJECT" -scheme "$SCHEME" \
+            -destination "platform=iOS Simulator,name=${{ steps.sim.outputs.device }}" \
+            test

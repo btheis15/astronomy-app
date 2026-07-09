@@ -1,5 +1,7 @@
 # AstroSky 🌌
 
+[![CI](https://github.com/btheis15/astronomy-app/actions/workflows/ci.yml/badge.svg)](https://github.com/btheis15/astronomy-app/actions/workflows/ci.yml)
+
 A native iOS AR astronomy app in the spirit of SkyView — point your iPhone at the sky and see stars, planets, constellations, Messier objects and live satellites (including the ISS and Starlink) overlaid on the camera view, in the right place, in real time.
 
 Built entirely with the modern Apple stack: **SwiftUI**, **ARKit + RealityKit**, **Swift Charts**, **CoreLocation** and the `@Observable` macro. No third-party dependencies — the planetary ephemeris and the SGP4 satellite propagator are implemented in pure Swift in this repo.

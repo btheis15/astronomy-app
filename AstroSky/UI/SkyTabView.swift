@@ -33,6 +33,15 @@ struct SkyTabView: View {
         .sheet(item: $capturedPhoto) { photo in
             ShareSheet(items: [photo.image])
         }
+        .onChange(of: appState.selectedObjectID) { _, _ in announceSelection() }
+    }
+
+    /// Speak the newly-selected object and its position for VoiceOver users.
+    private func announceSelection() {
+        guard let object = appState.selectedObject else { return }
+        let horizontal = object.horizontal(julianDate: appState.skyJulianDate, observer: appState.observer)
+        let message = "Selected \(object.name), altitude \(Int(horizontal.altitudeDegrees)) degrees, \(horizontal.compassDirection)."
+        UIAccessibility.post(notification: .announcement, argument: message)
     }
 
     private func capturePhoto() {
@@ -88,7 +97,7 @@ struct SkyTabView: View {
             Spacer()
 
             if appState.hasAlignmentOffset {
-                hudButton(systemImage: "arrow.counterclockwise") {
+                hudButton(systemImage: "arrow.counterclockwise", label: "Reset sky alignment") {
                     withAnimation(.snappy) { appState.resetAlignment() }
                 }
             }
@@ -104,16 +113,17 @@ struct SkyTabView: View {
                 .tint(.orange)
             }
 
-            hudButton(systemImage: "clock") {
+            hudButton(systemImage: "clock", label: "Time travel controls") {
                 showTimeControls.toggle()
             }
-            hudButton(systemImage: preferManualMode ? "arkit" : "hand.draw") {
+            hudButton(systemImage: preferManualMode ? "arkit" : "hand.draw",
+                      label: preferManualMode ? "Switch to AR mode" : "Switch to manual look-around mode") {
                 preferManualMode.toggle()
             }
-            hudButton(systemImage: isCapturing ? "camera.fill" : "camera") {
+            hudButton(systemImage: isCapturing ? "camera.fill" : "camera", label: "Take photo") {
                 capturePhoto()
             }
-            hudButton(systemImage: "magnifyingglass") {
+            hudButton(systemImage: "magnifyingglass", label: "Search the sky") {
                 showSearch = true
             }
         }
@@ -153,7 +163,7 @@ struct SkyTabView: View {
         .accessibilityLabel("Compass accuracy plus or minus \(Int(accuracy.rounded())) degrees")
     }
 
-    private func hudButton(systemImage: String, action: @escaping () -> Void) -> some View {
+    private func hudButton(systemImage: String, label: String = "", action: @escaping () -> Void) -> some View {
         Button(action: action) {
             Image(systemName: systemImage)
                 .font(.system(size: 17, weight: .medium))
@@ -161,6 +171,7 @@ struct SkyTabView: View {
                 .background(.ultraThinMaterial, in: Circle())
         }
         .buttonStyle(.plain)
+        .accessibilityLabel(label.isEmpty ? systemImage : label)
     }
 }
 
