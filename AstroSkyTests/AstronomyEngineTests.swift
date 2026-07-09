@@ -42,6 +42,15 @@ struct CoordinateTests {
         #expect(abs(eps - 23.4392911) < 0.0001)
     }
 
+    @Test func nutationMeeusExample22a() {
+        // 1987 April 10, 0h TD: Δψ ≈ −3.788″, Δε ≈ +9.443″ (Meeus example 22.a).
+        let jd = 2_446_895.5
+        let nutation = Nutation.nutation(julianDate: jd)
+        let arcsec = AstroMath.radToDeg * 3600.0
+        #expect(abs(nutation.longitude * arcsec - (-3.788)) < 0.5)
+        #expect(abs(nutation.obliquity * arcsec - 9.443) < 0.5)
+    }
+
     @Test func keplerSolver() {
         let m = 60.0 * AstroMath.degToRad
         let e = 0.1
@@ -116,14 +125,14 @@ struct SunMoonTests {
 struct PlanetTests {
     @Test func venusPositionMeeusExample33a() {
         // 1992 December 20, 0h TT: apparent α = 21h04m41.5s, δ = −18°53′17″.
-        // Our model omits light-time/aberration/nutation → tolerance 0.2°.
+        // With light-time, aberration and nutation applied we match to 0.05°.
         let jd = 2_448_976.5
         let position = PlanetEphemeris.position(of: .venus, julianDate: jd)
         let ofDate = CoordinateTransforms.precessFromJ2000(position.equatorialJ2000, julianDate: jd)
         let expected = EquatorialCoordinates(raHours: 21.0 + 4.0 / 60.0 + 41.5 / 3600.0,
                                              decDegrees: -(18.0 + 53.0 / 60.0 + 17.0 / 3600.0))
         let separation = CoordinateTransforms.angularSeparation(ofDate, expected) * AstroMath.radToDeg
-        #expect(separation < 0.2)
+        #expect(separation < 0.05)
         #expect(abs(position.distanceAU - 0.911) < 0.02)
     }
 
@@ -141,6 +150,66 @@ struct PlanetTests {
         let earth = PlanetEphemeris.heliocentricPosition(of: .earth, julianDate: jd)
         let r = (earth.x * earth.x + earth.y * earth.y + earth.z * earth.z).squareRoot()
         #expect(abs(r - 1.0) < 0.02)
+    }
+}
+
+struct EventsTests {
+    private func utc(_ y: Int, _ mo: Int, _ d: Int, _ h: Int = 0, _ mi: Int = 0) -> Date {
+        var c = DateComponents()
+        c.year = y; c.month = mo; c.day = d; c.hour = h; c.minute = mi
+        var cal = Calendar(identifier: .gregorian)
+        cal.timeZone = TimeZone(identifier: "UTC")!
+        return cal.date(from: c)!
+    }
+
+    @Test func nextFullMoonMatchesKnownInstant() {
+        // The 2015-09-28 full Moon (the total-eclipse "supermoon") peaked at
+        // ~02:50 UT. Searching from a week earlier must land within an hour.
+        let start = utc(2015, 9, 21)
+        let instants = EventsEngine.moonPhaseInstants(startingAt: start, days: 14, target: .pi)
+        #expect(!instants.isEmpty)
+        let known = utc(2015, 9, 28, 2, 50)
+        let closest = instants.min { abs($0.timeIntervalSince(known)) < abs($1.timeIntervalSince(known)) }!
+        #expect(abs(closest.timeIntervalSince(known)) < 3600)
+    }
+
+    @Test func fullMoonsAreOneSynodicMonthApart() {
+        let instants = EventsEngine.moonPhaseInstants(startingAt: utc(2026, 1, 1), days: 90, target: .pi)
+        #expect(instants.count >= 2)
+        let gap = instants[1].timeIntervalSince(instants[0]) / 86_400
+        #expect(abs(gap - 29.53) < 0.5)
+    }
+
+    @Test func perseidsActiveInMidAugust() {
+        let active = MeteorShowers.active(on: utc(2026, 8, 12, 6))
+        #expect(active.contains { $0.name == "Perseids" })
+        let june = MeteorShowers.active(on: utc(2026, 6, 15))
+        #expect(!june.contains { $0.name == "Perseids" })
+    }
+}
+
+struct MinorBodyTests {
+    @Test func ceresIsInTheAsteroidBelt() {
+        // Elements are osculating (epoch 2026-08-13); check the propagated
+        // state is physically sane across the belt for a nearby date.
+        let jd = 2_461_230.5   // 2026-08-... near epoch
+        let ceres = MinorBodyEphemeris.bodies.first { $0.key == "ceres" }!
+        let state = MinorBodyEphemeris.state(ceres, julianDate: jd)
+        // Ceres orbit: a(1±e) ⇒ 2.55–2.99 AU from the Sun.
+        #expect(state.heliocentricDistanceAU > 2.5 && state.heliocentricDistanceAU < 3.0)
+        // Earth–Ceres distance is bounded by (r−1) and (r+1) AU.
+        #expect(state.distanceAU > 1.4 && state.distanceAU < 4.0)
+        #expect(state.magnitude > 5 && state.magnitude < 11)
+        #expect(state.equatorialJ2000.raHours >= 0 && state.equatorialJ2000.raHours < 24)
+    }
+
+    @Test func allMinorBodiesHaveSaneDistances() {
+        let jd = AstroTime.julianDate(Date())
+        for body in MinorBodyEphemeris.bodies {
+            let state = MinorBodyEphemeris.state(body, julianDate: jd)
+            #expect(state.heliocentricDistanceAU > 1.5 && state.heliocentricDistanceAU < 3.6,
+                    "\(body.name) r = \(state.heliocentricDistanceAU)")
+        }
     }
 }
 

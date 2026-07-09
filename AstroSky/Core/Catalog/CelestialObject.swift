@@ -17,6 +17,7 @@ enum CelestialObjectKind: String, Sendable {
     case moon = "Moon"
     case deepSky = "Deep Sky"
     case satellite = "Satellite"
+    case minorBody = "Minor Planet"
 
     var iconSystemName: String {
         switch self {
@@ -26,6 +27,7 @@ enum CelestialObjectKind: String, Sendable {
         case .moon: "moon.fill"
         case .deepSky: "sparkles"
         case .satellite: "antenna.radiowaves.left.and.right"
+        case .minorBody: "circle.dotted"
         }
     }
 }

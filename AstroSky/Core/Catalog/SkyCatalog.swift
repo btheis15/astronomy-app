@@ -19,8 +19,14 @@ struct SkyCatalog {
     let sun = SunObject()
     let moon = MoonObject()
     let planets = PlanetObject.all
-    let deepSky = MessierCatalog.objects
+    let minorBodies = MinorBodyObject.all
+    let deepSky = SkyCatalog.allDeepSky
     let constellations = ConstellationCatalog.constellations
+
+    /// Every deep-sky object across all bundled catalogs (Messier + Caldwell +
+    /// famous NGC), used for markers, search and the catalog list.
+    static let allDeepSky: [DeepSkyObject] =
+        MessierCatalog.objects + CaldwellCatalog.objects + NGCHighlights.objects
 
     init() {
         if let deep = HYGCatalogLoader.loadIfAvailable() {
@@ -42,6 +48,7 @@ struct SkyCatalog {
     var allObjects: [any CelestialObject] {
         var objects: [any CelestialObject] = [sun, moon]
         objects.append(contentsOf: planets.map { $0 as any CelestialObject })
+        objects.append(contentsOf: minorBodies.map { $0 as any CelestialObject })
         objects.append(contentsOf: StarCatalog.stars.map { $0 as any CelestialObject })
         objects.append(contentsOf: deepSky.map { $0 as any CelestialObject })
         return objects

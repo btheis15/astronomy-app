@@ -166,21 +166,49 @@ enum PlanetEphemeris {
         return SIMD3(x, y, z)
     }
 
-    /// Full geocentric apparent state of a planet.
+    /// Full geocentric apparent state of a planet, including light-time,
+    /// annual aberration and nutation.
     static func position(of planet: Planet, julianDate jd: Double) -> PlanetPosition {
-        let helio = heliocentricPosition(of: planet, julianDate: jd)
         let earth = heliocentricPosition(of: .earth, julianDate: jd)
-        let geo = helio - earth
+
+        // Light-time correction: the planet is seen where it was τ days ago
+        // (τ ≈ 0.0057755 days per AU of range). Two iterations converge amply.
+        var lightDays = 0.0
+        var helio = heliocentricPosition(of: planet, julianDate: jd)
+        var geo = helio - earth
+        for _ in 0..<2 {
+            lightDays = simd_length(geo) * 0.005_775_518_3
+            helio = heliocentricPosition(of: planet, julianDate: jd - lightDays)
+            geo = helio - earth
+        }
 
         let distance = simd_length(geo)
         let sunDistance = simd_length(helio)
         let earthSunDistance = simd_length(earth)
 
-        let longitude = AstroMath.normalizedRadians(atan2(geo.y, geo.x))
-        let latitude = atan2(geo.z, sqrt(geo.x * geo.x + geo.y * geo.y))
-        let ecliptic = EclipticCoordinates(longitude: longitude, latitude: latitude)
+        let longitude0 = AstroMath.normalizedRadians(atan2(geo.y, geo.x))
+        let latitude0 = atan2(geo.z, sqrt(geo.x * geo.x + geo.y * geo.y))
 
-        // J2000 ecliptic → J2000 equatorial (use the J2000 obliquity).
+        // Apparent ecliptic place: annual aberration (Meeus eq. 23.2, using the
+        // Sun's longitude and Earth's orbit) plus nutation in longitude.
+        let t = AstroTime.julianCenturies(julianDate: jd)
+        let kappa = 20.49552 / 3600.0 * AstroMath.degToRad
+        let eEarth = 0.016708634 - 0.000042037 * t - 0.0000001267 * t * t
+        let periEarth = (102.93735 + 1.71946 * t + 0.00046 * t * t) * AstroMath.degToRad
+        let sunLongitude = SunEphemeris.position(julianDate: jd).ecliptic.longitude
+        let cosBeta = cos(latitude0)
+        let dLon = (-kappa * cos(sunLongitude - longitude0)
+                    + eEarth * kappa * cos(periEarth - longitude0)) / (cosBeta == 0 ? 1 : cosBeta)
+        let dLat = -kappa * sin(latitude0)
+            * (sin(sunLongitude - longitude0) - eEarth * sin(periEarth - longitude0))
+        let nutationLon = Nutation.nutation(julianDate: jd).longitude
+
+        let ecliptic = EclipticCoordinates(
+            longitude: AstroMath.normalizedRadians(longitude0 + dLon + nutationLon),
+            latitude: latitude0 + dLat)
+
+        // J2000 ecliptic → J2000 equatorial (use the J2000 obliquity); callers
+        // precess this to the date for display.
         let equatorial = CoordinateTransforms.eclipticToEquatorial(ecliptic, julianDate: AstroTime.j2000)
 
         // Phase angle from the triangle Sun–planet–Earth (law of cosines).

@@ -13,6 +13,7 @@ struct ObjectDetailView: View {
     @Environment(AppState.self) private var appState
     @Environment(\.dismiss) private var dismiss
     let object: any CelestialObject
+    @State private var showLogSheet = false
 
     var body: some View {
         List {
@@ -21,10 +22,27 @@ struct ObjectDetailView: View {
             riseSetSection
             AltitudeChartSection(object: object)
             infoSection
+            if object.kind != .satellite {
+                Section {
+                    Button {
+                        showLogSheet = true
+                    } label: {
+                        Label("Log observation", systemImage: "book.and.wrench")
+                    }
+                }
+            }
         }
         .navigationTitle(object.name)
         .navigationBarTitleDisplayMode(.inline)
         .toolbar {
+            ToolbarItem(placement: .topBarTrailing) {
+                Button {
+                    appState.toggleFavorite(object.id)
+                } label: {
+                    Image(systemName: appState.isFavorite(object.id) ? "star.fill" : "star")
+                        .foregroundStyle(appState.isFavorite(object.id) ? .yellow : .secondary)
+                }
+            }
             ToolbarItem(placement: .primaryAction) {
                 Button {
                     appState.select(object)
@@ -35,6 +53,9 @@ struct ObjectDetailView: View {
                     Label("Find in AR", systemImage: "arkit")
                 }
             }
+        }
+        .sheet(isPresented: $showLogSheet) {
+            LogObservationSheet(object: object)
         }
     }
 

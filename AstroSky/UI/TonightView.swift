@@ -12,10 +12,19 @@ struct TonightView: View {
     @Environment(AppState.self) private var appState
     @State private var passes: [SatellitePass] = []
     @State private var passesLoaded = false
+    @State private var brightestFirst = false
+    @State private var events: [AstroEvent] = []
+
+    /// Passes ordered either by time (default) or by peak brightness.
+    private var sortedPasses: [SatellitePass] {
+        guard brightestFirst else { return passes }
+        return passes.sorted { ($0.peakMagnitude ?? 99) < ($1.peakMagnitude ?? 99) }
+    }
 
     var body: some View {
         NavigationStack {
             List {
+                eventsSection
                 sunSection
                 moonSection
                 planetsSection
@@ -30,8 +39,43 @@ struct TonightView: View {
                 if !passesLoaded {
                     await reloadPasses()
                 }
+                if events.isEmpty {
+                    await reloadEvents()
+                }
             }
         }
+    }
+
+    // MARK: Events
+
+    @ViewBuilder private var eventsSection: some View {
+        if !events.isEmpty {
+            Section("Sky events · next 30 days") {
+                ForEach(events.prefix(8)) { event in
+                    HStack(spacing: 12) {
+                        Image(systemName: event.kind.iconSystemName)
+                            .foregroundStyle(.yellow)
+                            .frame(width: 28)
+                        VStack(alignment: .leading, spacing: 2) {
+                            Text(event.title)
+                            Text(event.detail).font(.caption).foregroundStyle(.secondary)
+                        }
+                        Spacer()
+                        Text(event.date.formatted(.dateTime.month().day()))
+                            .font(.caption.monospacedDigit())
+                            .foregroundStyle(.secondary)
+                    }
+                }
+            }
+        }
+    }
+
+    private func reloadEvents() async {
+        let observer = appState.observer
+        let start = Date()
+        events = await Task.detached(priority: .utility) {
+            EventsEngine.upcoming(observer: observer, startingAt: start, days: 30)
+        }.value
     }
 
     // MARK: Sun & twilight
@@ -139,25 +183,32 @@ struct TonightView: View {
                         : "Computing passes…")
                         .foregroundStyle(.secondary)
                 } else {
-                    ForEach(passes.prefix(8)) { pass in
+                    ForEach(sortedPasses.prefix(8)) { pass in
                         passRow(pass)
                     }
                 }
             }
         } header: {
-            Text("Visible satellite passes · next 24h")
+            HStack {
+                Text("Visible satellite passes · next 24h")
+                Spacer()
+                if !passes.isEmpty {
+                    Picker("Sort", selection: $brightestFirst) {
+                        Text("Time").tag(false)
+                        Text("Brightest").tag(true)
+                    }
+                    .pickerStyle(.menu)
+                    .textCase(nil)
+                }
+            }
         } footer: {
             Text("Passes where the satellite is sunlit against a dark sky, ≥ 10° up.")
         }
     }
 
     private func passRow(_ pass: SatellitePass) -> some View {
-        Button {
-            if let satellite = appState.satelliteService.satellite(withID: pass.satelliteID) {
-                appState.select(satellite)
-                appState.guideTargetID = satellite.id
-                appState.skyTabRequested = true
-            }
+        NavigationLink {
+            PassDetailView(pass: pass)
         } label: {
             HStack {
                 Image(systemName: "antenna.radiowaves.left.and.right")
@@ -170,9 +221,16 @@ struct TonightView: View {
                         .foregroundStyle(.secondary)
                 }
                 Spacer()
-                Text("max \(AstroFormat.degrees(pass.maxAltitude))")
-                    .font(.caption.monospacedDigit())
-                    .foregroundStyle(.secondary)
+                VStack(alignment: .trailing, spacing: 2) {
+                    Text("max \(AstroFormat.degrees(pass.maxAltitude))")
+                        .font(.caption.monospacedDigit())
+                        .foregroundStyle(.secondary)
+                    if let magnitude = pass.peakMagnitude {
+                        Text("mag \(magnitude, specifier: "%.1f")")
+                            .font(.caption2.monospacedDigit())
+                            .foregroundStyle(.secondary)
+                    }
+                }
             }
         }
     }

@@ -14,6 +14,26 @@ struct CatalogView: View {
     var body: some View {
         NavigationStack {
             List {
+                if !appState.favoriteObjects.isEmpty {
+                    Section("Favorites") {
+                        ForEach(appState.favoriteObjects, id: \.id) { object in
+                            NavigationLink {
+                                ObjectDetailView(object: object)
+                            } label: {
+                                CatalogRow(object: object)
+                            }
+                        }
+                    }
+                }
+
+                Section {
+                    NavigationLink {
+                        ObservationLogView()
+                    } label: {
+                        Label("Observing Log", systemImage: "book.closed")
+                    }
+                }
+
                 Section {
                     NavigationLink {
                         ObjectListView(title: "Solar System", objects: solarSystemObjects)
@@ -27,10 +47,19 @@ struct CatalogView: View {
                         Label("Bright Stars", systemImage: "star.fill")
                     }
                     NavigationLink {
-                        ObjectListView(title: "Messier Objects",
-                                       objects: appState.catalog.deepSky)
+                        ObjectListView(title: "Messier Objects", objects: MessierCatalog.objects)
                     } label: {
                         Label("Messier Objects", systemImage: "sparkles")
+                    }
+                    NavigationLink {
+                        ObjectListView(title: "Caldwell Objects", objects: CaldwellCatalog.objects)
+                    } label: {
+                        Label("Caldwell Objects", systemImage: "sparkles")
+                    }
+                    NavigationLink {
+                        ObjectListView(title: "NGC Highlights", objects: NGCHighlights.objects)
+                    } label: {
+                        Label("NGC Highlights", systemImage: "sparkles")
                     }
                     NavigationLink {
                         ConstellationListView()
@@ -67,6 +96,7 @@ struct CatalogView: View {
     private var solarSystemObjects: [any CelestialObject] {
         var objects: [any CelestialObject] = [appState.catalog.sun, appState.catalog.moon]
         objects.append(contentsOf: appState.catalog.planets.map { $0 as any CelestialObject })
+        objects.append(contentsOf: appState.catalog.minorBodies.map { $0 as any CelestialObject })
         return objects
     }
 
@@ -138,6 +168,16 @@ struct CatalogRow: View {
                 Text(object.subtitle).font(.caption).foregroundStyle(.secondary)
             }
             Spacer()
+            if object.kind == .satellite {
+                Button {
+                    appState.toggleFavoriteSatellite(object.id)
+                } label: {
+                    Image(systemName: appState.isFavoriteSatellite(object.id) ? "star.fill" : "star")
+                        .foregroundStyle(appState.isFavoriteSatellite(object.id) ? .yellow : .secondary)
+                }
+                .buttonStyle(.plain)
+                .padding(.trailing, 4)
+            }
             VStack(alignment: .trailing, spacing: 2) {
                 if let magnitude = object.magnitude {
                     Text("mag \(AstroFormat.magnitude(magnitude))")

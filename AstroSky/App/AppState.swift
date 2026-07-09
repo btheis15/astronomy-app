@@ -18,6 +18,7 @@ final class AppState {
     let catalog = SkyCatalog()
     let satelliteService = SatelliteService()
     let locationService = LocationService()
+    let notificationScheduler = PassNotificationScheduler()
 
     var observer: Observer { locationService.observer }
 
@@ -33,6 +34,40 @@ final class AppState {
 
     func resetToLiveTime() { timeOffset = 0 }
 
+    // MARK: Favorites (any object)
+
+    var favoriteObjectIDs: Set<String> {
+        get {
+            access(keyPath: \.favoriteObjectIDs)
+            return Set(UserDefaults.standard.stringArray(forKey: "favoriteObjectIDs") ?? [])
+        }
+        set {
+            withMutation(keyPath: \.favoriteObjectIDs) {
+                UserDefaults.standard.set(Array(newValue), forKey: "favoriteObjectIDs")
+            }
+        }
+    }
+
+    func isFavorite(_ id: String) -> Bool { favoriteObjectIDs.contains(id) }
+
+    func toggleFavorite(_ id: String) {
+        var favorites = favoriteObjectIDs
+        if favorites.contains(id) { favorites.remove(id) } else { favorites.insert(id) }
+        favoriteObjectIDs = favorites
+    }
+
+    var favoriteObjects: [any CelestialObject] {
+        favoriteObjectIDs.sorted().compactMap { object(withID: $0) }
+    }
+
+    // MARK: Onboarding
+
+    /// True once the first-launch onboarding flow has been completed or skipped.
+    var hasOnboarded: Bool {
+        get { access(keyPath: \.hasOnboarded); return defaults(bool: "hasOnboarded", default: false) }
+        set { withMutation(keyPath: \.hasOnboarded) { UserDefaults.standard.set(newValue, forKey: "hasOnboarded") } }
+    }
+
     // MARK: Selection & navigation
 
     /// Object currently shown in the info card / detail sheet.
@@ -41,6 +76,13 @@ final class AppState {
     var guideTargetID: String?
     /// Requests the Sky tab to become active (used by "Find in AR").
     var skyTabRequested = false
+
+    /// Manual fine-alignment of the AR sky overlay about the zenith axis,
+    /// in radians. Set by a two-finger horizontal drag in AR mode; lives here
+    /// so it survives tab switches and AR-view rebuilds.
+    var skyAlignmentOffset: Float = 0
+    var hasAlignmentOffset: Bool { abs(skyAlignmentOffset) > 0.0001 }
+    func resetAlignment() { skyAlignmentOffset = 0 }
 
     func select(_ object: (any CelestialObject)?) {
         selectedObjectID = object?.id
@@ -101,6 +143,55 @@ final class AppState {
         set { withMutation(keyPath: \.nightMode) { UserDefaults.standard.set(newValue, forKey: "nightMode") } }
     }
 
+    var showMeteorShowers: Bool {
+        get { access(keyPath: \.showMeteorShowers); return defaults(bool: "showMeteorShowers", default: true) }
+        set { withMutation(keyPath: \.showMeteorShowers) { UserDefaults.standard.set(newValue, forKey: "showMeteorShowers") } }
+    }
+
+    var showMilkyWay: Bool {
+        get { access(keyPath: \.showMilkyWay); return defaults(bool: "showMilkyWay", default: true) }
+        set { withMutation(keyPath: \.showMilkyWay) { UserDefaults.standard.set(newValue, forKey: "showMilkyWay") } }
+    }
+
+    /// Reference overlays drawn in the equatorial mesh frame.
+    var showEcliptic: Bool {
+        get { access(keyPath: \.showEcliptic); return defaults(bool: "showEcliptic", default: false) }
+        set { withMutation(keyPath: \.showEcliptic) { UserDefaults.standard.set(newValue, forKey: "showEcliptic") } }
+    }
+
+    var showCelestialEquator: Bool {
+        get { access(keyPath: \.showCelestialEquator); return defaults(bool: "showCelestialEquator", default: false) }
+        set { withMutation(keyPath: \.showCelestialEquator) { UserDefaults.standard.set(newValue, forKey: "showCelestialEquator") } }
+    }
+
+    var showCoordinateGrid: Bool {
+        get { access(keyPath: \.showCoordinateGrid); return defaults(bool: "showCoordinateGrid", default: false) }
+        set { withMutation(keyPath: \.showCoordinateGrid) { UserDefaults.standard.set(newValue, forKey: "showCoordinateGrid") } }
+    }
+
+    /// Bortle dark-sky class (1 = pristine … 9 = inner city). Caps how faint
+    /// the naked-eye sky gets and drives horizon light-pollution glow.
+    var bortleClass: Int {
+        get {
+            access(keyPath: \.bortleClass)
+            let stored = UserDefaults.standard.integer(forKey: "bortleClass")
+            return stored == 0 ? 4 : min(9, max(1, stored))
+        }
+        set { withMutation(keyPath: \.bortleClass) { UserDefaults.standard.set(min(9, max(1, newValue)), forKey: "bortleClass") } }
+    }
+
+    /// Naked-eye limiting magnitude implied by the Bortle class
+    /// (Bortle 1 → 7.5, Bortle 9 → 4.0, linear between).
+    var bortleLimitingMagnitude: Double {
+        7.5 - Double(bortleClass - 1) * (7.5 - 4.0) / 8.0
+    }
+
+    /// The magnitude limit actually used for rendering: the user's slider,
+    /// capped by what the Bortle sky can show.
+    var effectiveMagnitudeLimit: Double {
+        min(magnitudeLimit, bortleLimitingMagnitude)
+    }
+
     /// Faintest star magnitude rendered in AR.
     var magnitudeLimit: Double {
         get {
@@ -116,10 +207,61 @@ final class AppState {
         return UserDefaults.standard.bool(forKey: key)
     }
 
+    // MARK: Satellite favorites & pass notifications
+
+    var favoriteSatelliteIDs: Set<String> {
+        get {
+            access(keyPath: \.favoriteSatelliteIDs)
+            let stored = UserDefaults.standard.stringArray(forKey: "favoriteSatelliteIDs") ?? []
+            return Set(stored)
+        }
+        set {
+            withMutation(keyPath: \.favoriteSatelliteIDs) {
+                UserDefaults.standard.set(Array(newValue), forKey: "favoriteSatelliteIDs")
+            }
+        }
+    }
+
+    func isFavoriteSatellite(_ id: String) -> Bool { favoriteSatelliteIDs.contains(id) }
+
+    func toggleFavoriteSatellite(_ id: String) {
+        var favorites = favoriteSatelliteIDs
+        if favorites.contains(id) { favorites.remove(id) } else { favorites.insert(id) }
+        favoriteSatelliteIDs = favorites
+        Task { await refreshPassNotifications() }
+    }
+
+    var passNotificationsEnabled: Bool {
+        get { access(keyPath: \.passNotificationsEnabled); return defaults(bool: "passNotificationsEnabled", default: false) }
+        set { withMutation(keyPath: \.passNotificationsEnabled) { UserDefaults.standard.set(newValue, forKey: "passNotificationsEnabled") } }
+    }
+
+    /// Recompute upcoming visible passes for favorited satellites and schedule
+    /// (or clear) their pre-pass notifications.
+    func refreshPassNotifications() async {
+        guard passNotificationsEnabled, !favoriteSatelliteIDs.isEmpty else {
+            notificationScheduler.cancelAll()
+            return
+        }
+        let observer = observer
+        let favorites = favoriteSatelliteIDs.compactMap { satelliteService.satellite(withID: $0) }
+        let passes = await Task.detached(priority: .utility) {
+            favorites.flatMap {
+                $0.passes(observer: observer, startingAt: Date(), hours: 24)
+            }.filter(\.isVisible)
+        }.value
+        await notificationScheduler.reschedule(passes: passes)
+    }
+
     // MARK: Lifecycle
 
     func start() {
-        locationService.requestLocation()
-        Task { await satelliteService.start() }
+        // On first launch, onboarding requests location in context (page 2);
+        // afterwards request it up front.
+        if hasOnboarded { locationService.requestLocation() }
+        Task {
+            await satelliteService.start()
+            await refreshPassNotifications()
+        }
     }
 }

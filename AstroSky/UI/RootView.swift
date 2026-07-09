@@ -8,6 +8,7 @@ import SwiftUI
 struct RootView: View {
     @Environment(AppState.self) private var appState
     @State private var selectedTab: Tab = .sky
+    @State private var showOnboarding = false
 
     enum Tab: Hashable {
         case sky, tonight, catalog, settings
@@ -42,6 +43,10 @@ struct RootView: View {
             if appState.nightMode {
                 NightModeOverlay()
             }
+        }
+        .task { showOnboarding = !appState.hasOnboarded }
+        .fullScreenCover(isPresented: $showOnboarding) {
+            OnboardingView { showOnboarding = false }
         }
     }
 }

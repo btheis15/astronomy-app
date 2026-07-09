@@ -20,6 +20,9 @@ struct SatelliteObservation {
     var isSunlit: Bool
     /// Speed relative to the ECI frame in km/s.
     var speedKmPerSec: Double
+    /// Illuminated fraction of the satellite as seen by the observer, 0…1
+    /// (from the Sun–satellite–observer phase angle).
+    var illuminatedFraction: Double
 }
 
 struct SatellitePass: Identifiable, Sendable {
@@ -33,6 +36,8 @@ struct SatellitePass: Identifiable, Sendable {
     /// True if the satellite is sunlit at peak while the sky is dark —
     /// i.e. actually visible to the naked eye.
     var isVisible: Bool
+    /// Estimated apparent magnitude at peak (brighter = more negative), or nil.
+    var peakMagnitude: Double?
 
     var id: String { "\(satelliteID)-\(Int(start.timeIntervalSince1970))" }
 }
@@ -65,7 +70,10 @@ final class Satellite: CelestialObject, Identifiable, @unchecked Sendable {
     }
 
     var kind: CelestialObjectKind { .satellite }
-    var magnitude: Double? { nil }
+    /// Intrinsic standard magnitude, so tap-identify weighting treats bright
+    /// satellites (ISS) as bright. A time-specific estimate is available via
+    /// `estimatedMagnitude(julianDate:observer:)`.
+    var magnitude: Double? { standardMagnitude }
 
     func skyPosition(julianDate jd: Double, observer: Observer) -> SkyPosition {
         let obs = observe(julianDate: jd, observer: observer)
@@ -91,6 +99,12 @@ final class Satellite: CelestialObject, Identifiable, @unchecked Sendable {
             rows.append(("Orbit altitude", String(format: "%.0f km", obs.altitudeKm)))
             rows.append(("Speed", String(format: "%.2f km/s", obs.speedKmPerSec)))
             rows.append(("Illumination", obs.isSunlit ? "Sunlit" : "In Earth's shadow"))
+            if obs.isSunlit {
+                let mag = Self.estimatedMagnitude(standardMagnitude: standardMagnitude,
+                                                  rangeKm: obs.rangeKm,
+                                                  illuminatedFraction: obs.illuminatedFraction)
+                rows.append(("Est. magnitude", String(format: "%.1f", mag)))
+            }
         }
         return rows
     }
@@ -127,12 +141,57 @@ final class Satellite: CelestialObject, Identifiable, @unchecked Sendable {
         let geocentricRadius = simd_length(state.position)
         let satelliteAltKm = geocentricRadius - 6371.0
 
+        // Illuminated fraction from the phase angle at the satellite between
+        // the Sun and the observer (both expressed in ECEF).
+        let sunDir = SunEphemeris.position(julianDate: jd).equatorial.unitVector
+        let sunECEF = SIMD3(cosG * sunDir.x + sinG * sunDir.y,
+                            -sinG * sunDir.x + cosG * sunDir.y,
+                            sunDir.z)
+        let satToObserver = simd_normalize(observerECEF - ecef)
+        let cosPhase = simd_dot(sunECEF, satToObserver)
+        let illuminatedFraction = (1.0 + cosPhase) / 2.0
+
         return SatelliteObservation(
             horizontal: HorizontalCoordinates(altitude: altitude, azimuth: azimuth),
             rangeKm: range,
             altitudeKm: satelliteAltKm,
             isSunlit: Self.isSunlit(temePosition: state.position, julianDate: jd),
-            speedKmPerSec: simd_length(state.velocity))
+            speedKmPerSec: simd_length(state.velocity),
+            illuminatedFraction: illuminatedFraction)
+    }
+
+    // MARK: Brightness
+
+    /// Intrinsic "standard" magnitude at 1000 km range, full phase.
+    var standardMagnitude: Double {
+        if isISS { return -1.8 }
+        switch tle.catalogNumber {
+        case 20580: return 2.2                 // Hubble Space Telescope
+        case 48274: return 0.5                 // Tiangong / CSS (Tianhe core)
+        default: break
+        }
+        if tle.name.uppercased().contains("CSS") { return 0.5 }
+        if isStarlink { return 5.5 }
+        return 4.5
+    }
+
+    /// Standard satellite photometric model (McCants-style): brightness scales
+    /// with range² and inversely with illuminated fraction.
+    static func estimatedMagnitude(standardMagnitude: Double,
+                                   rangeKm: Double,
+                                   illuminatedFraction: Double) -> Double {
+        let fraction = max(0.01, illuminatedFraction)
+        return standardMagnitude - 15.75 + 2.5 * log10(rangeKm * rangeKm / fraction)
+    }
+
+    /// Estimated apparent magnitude for a time/observer; nil if not sunlit
+    /// (i.e. invisible).
+    func estimatedMagnitude(julianDate jd: Double, observer: Observer) -> Double? {
+        guard let observation = observe(julianDate: jd, observer: observer),
+              observation.isSunlit else { return nil }
+        return Self.estimatedMagnitude(standardMagnitude: standardMagnitude,
+                                       rangeKm: observation.rangeKm,
+                                       illuminatedFraction: observation.illuminatedFraction)
     }
 
     /// Predict passes above `minimumAltitude` within the next `hours` hours.
@@ -187,15 +246,22 @@ final class Satellite: CelestialObject, Identifiable, @unchecked Sendable {
         let sunEq = SunEphemeris.position(julianDate: peakJD).equatorial
         let sunAltitude = CoordinateTransforms.horizontal(of: sunEq, julianDate: peakJD,
                                                           observer: observer).altitude
-        let sunlit = observe(julianDate: peakJD, observer: observer)?.isSunlit ?? false
+        let peakObservation = observe(julianDate: peakJD, observer: observer)
+        let sunlit = peakObservation?.isSunlit ?? false
         let darkSky = sunAltitude < -6.0 * AstroMath.degToRad
+        let peakMagnitude = peakObservation.map {
+            Self.estimatedMagnitude(standardMagnitude: standardMagnitude,
+                                    rangeKm: $0.rangeKm,
+                                    illuminatedFraction: $0.illuminatedFraction)
+        }
         return SatellitePass(satelliteID: id,
                              satelliteName: name,
                              start: start,
                              peak: peak,
                              end: end,
                              maxAltitude: maxAltitude,
-                             isVisible: sunlit && darkSky)
+                             isVisible: sunlit && darkSky,
+                             peakMagnitude: peakMagnitude)
     }
 
     // MARK: Static helpers

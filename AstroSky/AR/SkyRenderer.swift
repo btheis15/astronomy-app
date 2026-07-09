@@ -43,16 +43,26 @@ final class SkyRenderer: NSObject {
     private let worldAnchor = AnchorEntity(world: matrix_identity_float4x4)
     private let skyRoot = Entity()
     private var starField: Entity
+    private let milkyWay: Entity
     private let constellationLines: Entity
     private let constellationLabels: Entity
+    private let celestialEquator: Entity
+    private let ecliptic: Entity
+    private let coordinateGrid: Entity
     private let starLabels: Entity
+    private let starLabelTiers: [(entity: Entity, magnitude: Double)]
     private let deepSkyMarkers: Entity
+    private let messierSecondaryLabels: [Entity]
     private let solarSystemRoot: Entity
     private let solarSystemMarkers: [String: Entity]
     private let horizon: Entity
     private let selectionHighlight: Entity
     private var satelliteEntities: [String: Entity] = [:]
     private let satelliteRoot = Entity()
+    private var satelliteTrack = Entity()
+    private var meteorRadiants = Entity()
+    private var lastActiveShowers: Set<String> = []
+    private let horizonGlow: Entity
 
     // Update bookkeeping.
     private var updateTimer: Timer?
@@ -72,7 +82,7 @@ final class SkyRenderer: NSObject {
 
     init(appState: AppState, preferManualMode: Bool) {
         self.appState = appState
-        self.lastMagnitudeLimit = appState.magnitudeLimit
+        self.lastMagnitudeLimit = appState.effectiveMagnitudeLimit
 
         let arSupported = ARWorldTrackingConfiguration.isSupported
         self.isARMode = arSupported && !preferManualMode
@@ -84,28 +94,44 @@ final class SkyRenderer: NSObject {
 
         // Build the static scene once.
         starField = SkySceneBuilder.buildStarField(stars: appState.catalog.stars,
-                                                   magnitudeLimit: appState.magnitudeLimit)
+                                                   magnitudeLimit: appState.effectiveMagnitudeLimit)
+        milkyWay = SkySceneBuilder.buildMilkyWay()
         constellationLines = SkySceneBuilder.buildConstellationLines()
         constellationLabels = SkySceneBuilder.buildConstellationLabels()
-        starLabels = SkySceneBuilder.buildStarLabels(stars: appState.catalog.stars)
-        deepSkyMarkers = SkySceneBuilder.buildDeepSkyMarkers()
+        celestialEquator = SkySceneBuilder.buildCelestialEquator()
+        ecliptic = SkySceneBuilder.buildEcliptic()
+        coordinateGrid = SkySceneBuilder.buildCoordinateGrid()
+        let builtStarLabels = SkySceneBuilder.buildStarLabels(stars: appState.catalog.stars)
+        starLabels = builtStarLabels.root
+        starLabelTiers = builtStarLabels.tiers
+        let builtDeepSky = SkySceneBuilder.buildDeepSkyMarkers()
+        deepSkyMarkers = builtDeepSky.root
+        messierSecondaryLabels = builtDeepSky.secondaryLabels
         let solar = SkySceneBuilder.buildSolarSystemMarkers()
         solarSystemRoot = solar.root
         solarSystemMarkers = solar.markers
         horizon = SkySceneBuilder.buildHorizon()
+        horizonGlow = SkySceneBuilder.buildHorizonGlow()
         selectionHighlight = SkySceneBuilder.buildSelectionHighlight()
 
         super.init()
 
+        skyRoot.addChild(milkyWay)
         skyRoot.addChild(starField)
+        skyRoot.addChild(coordinateGrid)
+        skyRoot.addChild(celestialEquator)
+        skyRoot.addChild(ecliptic)
         skyRoot.addChild(constellationLines)
         skyRoot.addChild(constellationLabels)
         skyRoot.addChild(starLabels)
         skyRoot.addChild(deepSkyMarkers)
+        skyRoot.addChild(meteorRadiants)
         skyRoot.addChild(solarSystemRoot)
         worldAnchor.addChild(skyRoot)
+        worldAnchor.addChild(horizonGlow)
         worldAnchor.addChild(horizon)
         worldAnchor.addChild(satelliteRoot)
+        worldAnchor.addChild(satelliteTrack)
         worldAnchor.addChild(selectionHighlight)
         arView.scene.addAnchor(worldAnchor)
 
@@ -127,6 +153,16 @@ final class SkyRenderer: NSObject {
         let tap = UITapGestureRecognizer(target: self, action: #selector(handleTap(_:)))
         arView.addGestureRecognizer(tap)
 
+        // AR fine-alignment: a two-finger horizontal drag rotates the overlay
+        // about the zenith to correct heading error. (Manual mode uses one- and
+        // two-finger drags for looking around, so this is AR-only.)
+        if isARMode {
+            let alignPan = UIPanGestureRecognizer(target: self, action: #selector(handleAlignPan(_:)))
+            alignPan.minimumNumberOfTouches = 2
+            alignPan.maximumNumberOfTouches = 2
+            arView.addGestureRecognizer(alignPan)
+        }
+
         // Per-frame camera tracking for the guidance arrow (throttled).
         sceneSubscription = arView.scene.subscribe(to: SceneEvents.Update.self) { [weak self] _ in
             Task { @MainActor [weak self] in
@@ -146,6 +182,41 @@ final class SkyRenderer: NSObject {
         tick()
     }
 
+    /// Capture the current sky view (camera feed + overlay in AR mode) and
+    /// composite a small "AstroSky · date · place" caption onto it.
+    func captureSnapshot() async -> UIImage? {
+        let base: UIImage? = await withCheckedContinuation { continuation in
+            arView.snapshot(saveToHDR: false) { image in
+                continuation.resume(returning: image)
+            }
+        }
+        guard let base else { return nil }
+
+        let place = appState.locationService.placeName
+            ?? String(format: "%.1f°, %.1f°", appState.observer.latitudeDegrees, appState.observer.longitudeDegrees)
+        let dateText = appState.skyDate.formatted(date: .abbreviated, time: .shortened)
+        let caption = "AstroSky · \(dateText) · \(place)"
+
+        let renderer = UIGraphicsImageRenderer(size: base.size)
+        return renderer.image { context in
+            base.draw(at: .zero)
+            let fontSize = max(14, base.size.width * 0.028)
+            let attributes: [NSAttributedString.Key: Any] = [
+                .font: UIFont.systemFont(ofSize: fontSize, weight: .semibold),
+                .foregroundColor: UIColor.white,
+            ]
+            let textSize = (caption as NSString).size(withAttributes: attributes)
+            let margin = fontSize
+            let box = CGRect(x: margin, y: base.size.height - textSize.height - margin * 1.6,
+                             width: textSize.width + fontSize, height: textSize.height + fontSize * 0.6)
+            let pill = UIBezierPath(roundedRect: box, cornerRadius: box.height / 2)
+            UIColor.black.withAlphaComponent(0.45).setFill()
+            pill.fill()
+            (caption as NSString).draw(at: CGPoint(x: box.minX + fontSize / 2, y: box.minY + fontSize * 0.3),
+                                       withAttributes: attributes)
+        }
+    }
+
     func tearDown() {
         updateTimer?.invalidate()
         updateTimer = nil
@@ -161,20 +232,50 @@ final class SkyRenderer: NSObject {
         let jd = appState.skyJulianDate
         let observer = appState.observer
 
-        // Sidereal rotation of the whole sky.
-        skyRoot.orientation = SkySceneBuilder.skyOrientation(julianDate: jd, observer: observer)
+        // Sidereal rotation of the whole sky, with the manual fine-alignment
+        // offset applied about the zenith (scene +Y) on top of it.
+        let baseOrientation = SkySceneBuilder.skyOrientation(julianDate: jd, observer: observer)
+        let alignment = simd_quatf(angle: appState.skyAlignmentOffset, axis: SIMD3(0, 1, 0))
+        skyRoot.orientation = alignment * baseOrientation
 
         // Settings.
         constellationLines.isEnabled = appState.showConstellationLines
-        constellationLabels.isEnabled = appState.showConstellationLines && appState.showLabels
-        starLabels.isEnabled = appState.showLabels
+        celestialEquator.isEnabled = appState.showCelestialEquator
+        ecliptic.isEnabled = appState.showEcliptic
+        coordinateGrid.isEnabled = appState.showCoordinateGrid
+
+        // Milky Way: on/off, and dim with the magnitude-limit slider (a lower
+        // limit ≈ more light pollution ⇒ a fainter band).
+        milkyWay.isEnabled = appState.showMilkyWay
+        if appState.showMilkyWay {
+            let t = (appState.magnitudeLimit - 2.0) / (6.5 - 2.0)
+            let opacity = Float(0.2 + 0.8 * min(1, max(0, t)))
+            milkyWay.components.set(OpacityComponent(opacity: opacity))
+        }
         deepSkyMarkers.isEnabled = appState.showDeepSky
         satelliteRoot.isEnabled = appState.showSatellites
+        updateLabelDensity()
 
-        if appState.magnitudeLimit != lastMagnitudeLimit {
-            lastMagnitudeLimit = appState.magnitudeLimit
+        // Meteor-shower radiants: rebuild when the active set changes.
+        if appState.showMeteorShowers {
+            let active = Set(MeteorShowers.active(on: appState.skyDate).map(\.name))
+            if active != lastActiveShowers {
+                lastActiveShowers = active
+                rebuildMeteorRadiants()
+            }
+        }
+        meteorRadiants.isEnabled = appState.showMeteorShowers
+
+        if appState.effectiveMagnitudeLimit != lastMagnitudeLimit {
+            lastMagnitudeLimit = appState.effectiveMagnitudeLimit
             rebuildStarField()
         }
+
+        // Horizon light-pollution glow scales with the Bortle class
+        // (Bortle 1 ≈ none, Bortle 9 ≈ strong wash-out near the horizon).
+        let glowStrength = Float(appState.bortleClass - 1) / 8.0
+        horizonGlow.isEnabled = glowStrength > 0.01
+        horizonGlow.components.set(OpacityComponent(opacity: glowStrength))
 
         // Solar system moves slowly; recompute every 30 sky-seconds.
         if abs(jd - lastSolarUpdateJD) * 86_400 > 30 {
@@ -183,13 +284,54 @@ final class SkyRenderer: NSObject {
         }
 
         updateSatellites(julianDate: jd, observer: observer)
+        updateSatelliteTrack(julianDate: jd, observer: observer)
         updateSelectionHighlight(julianDate: jd, observer: observer)
+    }
+
+    /// Effective vertical field of view in degrees. Manual mode tracks the
+    /// pinch-zoom FOV; AR mode is roughly fixed, so it uses a nominal value.
+    private var currentFOV: Float { isARMode ? 60 : manualFOV }
+
+    /// Reveal or hide labels by density as the view zooms: at a narrow FOV
+    /// (zoomed in) show fainter star labels and every Messier designation; at
+    /// a wide FOV show only the brightest star labels and constellation names.
+    private func updateLabelDensity() {
+        let fov = currentFOV
+        // Star-label magnitude cutoff: 3.5 at ≤40°, 1.5 at ≥60°, lerp between.
+        let cutoff: Double
+        if fov <= 40 { cutoff = 3.5 }
+        else if fov >= 60 { cutoff = 1.5 }
+        else { cutoff = 3.5 - Double((fov - 40) / 20) * (3.5 - 1.5) }
+
+        starLabels.isEnabled = appState.showLabels
+        if appState.showLabels {
+            for tier in starLabelTiers {
+                tier.entity.isEnabled = tier.magnitude <= cutoff
+            }
+        }
+
+        // Constellation names: only at a wide-enough FOV (they clutter a
+        // zoomed-in view where individual star labels take over).
+        constellationLabels.isEnabled =
+            appState.showConstellationLines && appState.showLabels && fov >= 45
+
+        // Full Messier designations only when zoomed in.
+        let showAllMessier = appState.showDeepSky && appState.showLabels && fov <= 40
+        for label in messierSecondaryLabels {
+            label.isEnabled = showAllMessier
+        }
+    }
+
+    private func rebuildMeteorRadiants() {
+        meteorRadiants.removeFromParent()
+        meteorRadiants = SkySceneBuilder.buildMeteorRadiants(MeteorShowers.active(on: appState.skyDate))
+        skyRoot.addChild(meteorRadiants)
     }
 
     private func rebuildStarField() {
         starField.removeFromParent()
         starField = SkySceneBuilder.buildStarField(stars: appState.catalog.stars,
-                                                   magnitudeLimit: appState.magnitudeLimit)
+                                                   magnitudeLimit: appState.effectiveMagnitudeLimit)
         skyRoot.addChild(starField)
     }
 
@@ -201,6 +343,10 @@ final class SkyRenderer: NSObject {
         for planet in Planet.visible {
             positions["planet.\(planet.rawValue)"] =
                 PlanetEphemeris.position(of: planet, julianDate: jd).equatorialJ2000
+        }
+        for body in MinorBodyEphemeris.bodies {
+            positions["minor.\(body.key)"] =
+                MinorBodyEphemeris.state(body, julianDate: jd).equatorialJ2000
         }
         for (id, eq) in positions {
             guard let marker = solarSystemMarkers[id] else { continue }
@@ -252,6 +398,32 @@ final class SkyRenderer: NSObject {
             entity.removeFromParent()
             satelliteEntities.removeValue(forKey: id)
         }
+    }
+
+    /// Draw a ±10-minute predicted sky track for the selected satellite,
+    /// sampled every 15 s (world frame). Rebuilt each tick so it follows both
+    /// the satellite's motion and any time-travel change.
+    private func updateSatelliteTrack(julianDate jd: Double, observer: Observer) {
+        satelliteTrack.removeFromParent()
+        satelliteTrack = Entity()
+        worldAnchor.addChild(satelliteTrack)
+
+        guard appState.showSatellites,
+              let satellite = appState.selectedObject as? Satellite else { return }
+
+        let radius = SkySceneBuilder.sphereRadius * 0.9
+        let points: [SIMD3<Float>?] = stride(from: -600.0, through: 600.0, by: 15.0).map { offset in
+            let sampleJD = jd + offset / 86_400.0
+            guard let observation = satellite.observe(julianDate: sampleJD, observer: observer),
+                  observation.horizontal.altitude > -0.05 else { return nil }
+            return SkySceneBuilder.sceneDirection(horizontal: observation.horizontal) * radius
+        }
+
+        let color = satellite.isStarlink
+            ? UIColor(white: 0.8, alpha: 1)
+            : UIColor(red: 0.55, green: 1.0, blue: 0.75, alpha: 1)
+        let track = SkySceneBuilder.buildSatelliteTrack(points: points, color: color)
+        satelliteTrack.addChild(track)
     }
 
     private func updateSelectionHighlight(julianDate jd: Double, observer: Observer) {
@@ -351,6 +523,7 @@ final class SkyRenderer: NSObject {
         // Solar system + satellites: use live scene positions.
         var solarObjects: [any CelestialObject] = [appState.catalog.sun, appState.catalog.moon]
         solarObjects.append(contentsOf: appState.catalog.planets.map { $0 as any CelestialObject })
+        solarObjects.append(contentsOf: appState.catalog.minorBodies.map { $0 as any CelestialObject })
         for object in solarObjects {
             if let dir = worldDirection(of: object, julianDate: jd, observer: observer),
                object.horizontal(julianDate: jd, observer: observer).altitude > -0.05 {
@@ -372,7 +545,7 @@ final class SkyRenderer: NSObject {
         // Stars & deep sky: rotate catalog vectors by the current sky
         // orientation instead of walking entities.
         let orientation = skyRoot.orientation
-        for star in appState.catalog.stars where star.visualMagnitude <= appState.magnitudeLimit {
+        for star in appState.catalog.stars where star.visualMagnitude <= appState.effectiveMagnitudeLimit {
             let world = orientation.act(SkySceneBuilder.equatorialVector(star.equatorialJ2000))
             consider(star, worldDirection: world)
         }
@@ -406,10 +579,19 @@ final class SkyRenderer: NSObject {
         applyManualCameraOrientation()
     }
 
+    @objc private func handleAlignPan(_ gesture: UIPanGestureRecognizer) {
+        let translation = gesture.translation(in: arView)
+        gesture.setTranslation(.zero, in: arView)
+        // Map a full screen-width drag to roughly the horizontal field of view.
+        let radiansPerPoint = Float(60 * AstroMath.degToRad) / Float(max(arView.bounds.width, 1))
+        appState.skyAlignmentOffset += Float(translation.x) * radiansPerPoint
+    }
+
     @objc private func handlePinch(_ gesture: UIPinchGestureRecognizer) {
         manualFOV = min(max(manualFOV / Float(gesture.scale), 20), 90)
         gesture.scale = 1
         manualCamera.camera.fieldOfViewInDegrees = manualFOV
+        updateLabelDensity()
     }
 
     private func applyManualCameraOrientation() {
