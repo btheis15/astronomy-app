@@ -19,6 +19,7 @@ struct SettingsView: View {
                     Toggle("Constellation figures", isOn: $appState.showConstellationLines)
                     Toggle("Labels", isOn: $appState.showLabels)
                     Toggle("Deep-sky objects (Messier)", isOn: $appState.showDeepSky)
+                    Toggle("Milky Way", isOn: $appState.showMilkyWay)
                     VStack(alignment: .leading) {
                         HStack {
                             Text("Faintest stars")
@@ -29,6 +30,26 @@ struct SettingsView: View {
                         }
                         Slider(value: $appState.magnitudeLimit, in: 2.0...6.5, step: 0.5)
                     }
+                    Picker("Sky darkness", selection: $appState.bortleClass) {
+                        ForEach(1...9, id: \.self) { bortle in
+                            Text("Bortle \(bortle)").tag(bortle)
+                        }
+                    }
+                    LabeledContent("Limiting magnitude",
+                                   value: String(format: "%.1f", appState.bortleLimitingMagnitude))
+                        .foregroundStyle(.secondary)
+                        .font(.caption)
+                }
+
+                Section {
+                    Toggle("Ecliptic", isOn: $appState.showEcliptic)
+                    Toggle("Celestial equator", isOn: $appState.showCelestialEquator)
+                    Toggle("RA/Dec grid", isOn: $appState.showCoordinateGrid)
+                    Toggle("Meteor shower radiants", isOn: $appState.showMeteorShowers)
+                } header: {
+                    Text("Reference lines")
+                } footer: {
+                    Text("Great-circle overlays: the ecliptic (the Sun and planets' path), the celestial equator, and a right-ascension/declination grid.")
                 }
 
                 Section {

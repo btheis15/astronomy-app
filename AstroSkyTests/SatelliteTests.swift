@@ -134,6 +134,23 @@ struct SatelliteGeometryTests {
         #expect(abs(pole.x) < 0.01)
     }
 
+    @Test func issOverheadMagnitudeInRange() {
+        // A near-overhead ISS pass (~450 km range) at roughly half phase should
+        // land in the naked-eye-bright range of about −4 to −1.
+        let mag = Satellite.estimatedMagnitude(standardMagnitude: -1.8,
+                                               rangeKm: 450,
+                                               illuminatedFraction: 0.5)
+        #expect(mag > -4 && mag < -1)
+    }
+
+    @Test func brighterWhenCloserAndMoreLit() {
+        let far = Satellite.estimatedMagnitude(standardMagnitude: -1.8, rangeKm: 1500, illuminatedFraction: 0.5)
+        let near = Satellite.estimatedMagnitude(standardMagnitude: -1.8, rangeKm: 450, illuminatedFraction: 0.5)
+        let fuller = Satellite.estimatedMagnitude(standardMagnitude: -1.8, rangeKm: 450, illuminatedFraction: 1.0)
+        #expect(near < far)          // closer ⇒ brighter (smaller magnitude)
+        #expect(fuller < near)       // more illuminated ⇒ brighter
+    }
+
     @Test func sunlitTestBasicGeometry() {
         let jd = 2_460_000.5
         let sunDir = SunEphemeris.position(julianDate: jd).equatorial.unitVector
@@ -184,6 +201,40 @@ struct CatalogIntegrityTests {
             #expect(ConstellationCatalog.names[star.constellationAbbreviation] != nil,
                     "\(star.key): unknown constellation \(star.constellationAbbreviation)")
         }
+    }
+
+    @Test func caldwellCatalogIsValid() {
+        let objects = CaldwellCatalog.objects
+        #expect(objects.count == 109)
+        #expect(Set(objects.map(\.catalogNumber)) == Set(1...109))
+        for object in objects {
+            #expect(object.raHours >= 0 && object.raHours < 24)
+            #expect(object.decDegrees > -90 && object.decDegrees < 90)
+            #expect(ConstellationCatalog.names[object.constellationAbbreviation] != nil,
+                    "C\(object.catalogNumber): unknown constellation \(object.constellationAbbreviation)")
+        }
+    }
+
+    @Test func ngcHighlightsAreValid() {
+        let objects = NGCHighlights.objects
+        #expect(objects.count >= 30)
+        var seen = Set<Int>()
+        for object in objects {
+            #expect(!seen.contains(object.catalogNumber), "duplicate NGC \(object.catalogNumber)")
+            seen.insert(object.catalogNumber)
+            #expect(object.raHours >= 0 && object.raHours < 24)
+            #expect(object.decDegrees > -90 && object.decDegrees < 90)
+            #expect(ConstellationCatalog.names[object.constellationAbbreviation] != nil,
+                    "NGC \(object.catalogNumber): unknown constellation \(object.constellationAbbreviation)")
+        }
+    }
+
+    @Test func caldwellSearchableByDesignationAndName() {
+        let catalog = SkyCatalog()
+        #expect(catalog.search("C14").contains { $0.id == "c014" })
+        #expect(catalog.search("Double Cluster").contains {
+            ($0 as? DeepSkyObject)?.commonName == "Double Cluster"
+        })
     }
 
     @Test func hygLoaderParsesSample() {

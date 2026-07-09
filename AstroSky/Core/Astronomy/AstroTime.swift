@@ -48,6 +48,20 @@ enum AstroTime {
         AstroMath.normalizedRadians(greenwichMeanSiderealTime(julianDate: jd) + longitude)
     }
 
+    /// Greenwich *Apparent* Sidereal Time in radians: GMST plus the equation of
+    /// the equinoxes, Δψ·cos ε (Meeus ch. 12). Use for apparent hour angles.
+    static func greenwichApparentSiderealTime(julianDate jd: Double) -> Double {
+        let nutation = Nutation.nutation(julianDate: jd)
+        let epsilon = CoordinateTransforms.trueObliquity(julianDate: jd)
+        return AstroMath.normalizedRadians(
+            greenwichMeanSiderealTime(julianDate: jd) + nutation.longitude * cos(epsilon))
+    }
+
+    /// Local Apparent Sidereal Time in radians for an observer at `longitude`.
+    static func localApparentSiderealTime(julianDate jd: Double, longitude: Double) -> Double {
+        AstroMath.normalizedRadians(greenwichApparentSiderealTime(julianDate: jd) + longitude)
+    }
+
     /// Approximate ΔT = TT − UT in seconds (Espenak & Meeus polynomial,
     /// adequate for 2005–2050). Used where dynamical time matters; for the
     /// visual purposes of this app the ~1 arcsecond effect is negligible,

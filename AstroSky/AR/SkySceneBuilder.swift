@@ -97,39 +97,112 @@ enum SkySceneBuilder {
         UIColor(red: 1.00, green: 0.72, blue: 0.52, alpha: 1),  // red-orange
     ]
 
+    /// Soft round glow sprite, generated once at runtime (white core →
+    /// transparent edge). Tinted per color bucket by the material.
+    static let glowTexture: TextureResource? = makeStarSprite(spikes: false)
+    /// Variant with faint 4-point diffraction spikes for the brightest stars.
+    static let spikeTexture: TextureResource? = makeStarSprite(spikes: true)
+
+    /// Core Graphics radial-gradient sprite (optionally with diffraction
+    /// spikes). RGB is white; the radial alpha falloff gives the round glow.
+    private static func makeStarSprite(spikes: Bool) -> TextureResource? {
+        let dimension = 128
+        let renderer = UIGraphicsImageRenderer(size: CGSize(width: dimension, height: dimension))
+        let image = renderer.image { context in
+            let cg = context.cgContext
+            let center = CGPoint(x: dimension / 2, y: dimension / 2)
+            let maxRadius = CGFloat(dimension) / 2
+            let space = CGColorSpaceCreateDeviceRGB()
+            let glow = CGGradient(colorsSpace: space,
+                                  colors: [UIColor(white: 1, alpha: 1).cgColor,
+                                           UIColor(white: 1, alpha: 0).cgColor] as CFArray,
+                                  locations: [0, 1])!
+            cg.drawRadialGradient(glow, startCenter: center, startRadius: 0,
+                                  endCenter: center, endRadius: maxRadius * 0.95, options: [])
+            if spikes {
+                cg.setBlendMode(.plusLighter)
+                let spike = CGGradient(colorsSpace: space,
+                                       colors: [UIColor(white: 1, alpha: 0.85).cgColor,
+                                                UIColor(white: 1, alpha: 0).cgColor] as CFArray,
+                                       locations: [0, 1])!
+                for angle in [0.0, Double.pi / 2] {
+                    cg.saveGState()
+                    cg.translateBy(x: center.x, y: center.y)
+                    cg.rotate(by: CGFloat(angle))
+                    cg.clip(to: CGRect(x: -maxRadius, y: -3, width: maxRadius * 2, height: 6))
+                    cg.drawRadialGradient(spike, startCenter: .zero, startRadius: 0,
+                                          endCenter: .zero, endRadius: maxRadius, options: [])
+                    cg.restoreGState()
+                }
+            }
+        }
+        guard let cgImage = image.cgImage else { return nil }
+        return try? TextureResource(image: cgImage, withName: spikes ? "starSpike" : "starGlow",
+                                    options: .init(semantic: .color))
+    }
+
+    /// Unlit, additively-transparent material carrying a star sprite tinted to
+    /// the bucket color; the sprite's alpha channel drives the soft edge.
+    static func starMaterial(tint: UIColor, texture: TextureResource) -> UnlitMaterial {
+        var material = UnlitMaterial(color: tint)
+        material.color = .init(tint: tint, texture: .init(texture))
+        material.blending = .transparent(opacity: .init(floatLiteral: 1.0))
+        return material
+    }
+
     /// Apparent quad half-size in meters for a magnitude, at sphereRadius.
     static func starSize(magnitude: Double) -> Float {
         let size = 0.95 * pow(0.80, magnitude)
         return Float(min(1.8, max(0.16, size)))
     }
 
-    /// Build the batched star-field entity (one child per color bucket).
+    /// Build the batched star-field entity: one textured child per color
+    /// bucket for ordinary stars (soft round glow) and one per bucket for the
+    /// brightest stars (mag < 0.5), which get the diffraction-spike sprite.
     static func buildStarField(stars: [Star], magnitudeLimit: Double) -> Entity {
         let root = Entity()
         root.name = "starField"
 
-        var bucketVertices: [[SIMD3<Float>]] = Array(repeating: [], count: bucketColors.count)
-        var bucketIndices: [[UInt32]] = Array(repeating: [], count: bucketColors.count)
+        let count = bucketColors.count
+        var glowV = Array(repeating: [SIMD3<Float>](), count: count)
+        var glowI = Array(repeating: [UInt32](), count: count)
+        var glowUV = Array(repeating: [SIMD2<Float>](), count: count)
+        var spikeV = Array(repeating: [SIMD3<Float>](), count: count)
+        var spikeI = Array(repeating: [UInt32](), count: count)
+        var spikeUV = Array(repeating: [SIMD2<Float>](), count: count)
 
         for star in stars where star.visualMagnitude <= magnitudeLimit {
             let bucket = colorBucket(forColorIndex: star.colorIndex)
             let direction = equatorialVector(star.equatorialJ2000)
-            appendQuad(center: direction * sphereRadius,
-                       radialDirection: direction,
-                       halfSize: starSize(magnitude: star.visualMagnitude),
-                       vertices: &bucketVertices[bucket],
-                       indices: &bucketIndices[bucket])
-        }
-
-        for bucket in bucketColors.indices where !bucketVertices[bucket].isEmpty {
-            if let mesh = makeMesh(name: "stars\(bucket)",
-                                   vertices: bucketVertices[bucket],
-                                   indices: bucketIndices[bucket]) {
-                let material = UnlitMaterial(color: bucketColors[bucket])
-                let entity = ModelEntity(mesh: mesh, materials: [material])
-                root.addChild(entity)
+            let center = direction * sphereRadius
+            let bright = star.visualMagnitude < 0.5
+            // Sprites carry a transparent margin, so enlarge the quad a touch
+            // (more for the spiked brightest stars) to keep the disk sized.
+            let half = starSize(magnitude: star.visualMagnitude) * (bright ? 2.2 : 1.4)
+            if bright {
+                appendQuad(center: center, radialDirection: direction, halfSize: half,
+                           vertices: &spikeV[bucket], indices: &spikeI[bucket], uvs: &spikeUV[bucket])
+            } else {
+                appendQuad(center: center, radialDirection: direction, halfSize: half,
+                           vertices: &glowV[bucket], indices: &glowI[bucket], uvs: &glowUV[bucket])
             }
         }
+
+        func addBuckets(vertices: [[SIMD3<Float>]], indices: [[UInt32]], uvs: [[SIMD2<Float>]],
+                        texture: TextureResource?, tag: String) {
+            for bucket in bucketColors.indices where !vertices[bucket].isEmpty {
+                guard let mesh = makeMesh(name: "\(tag)\(bucket)",
+                                          vertices: vertices[bucket],
+                                          indices: indices[bucket],
+                                          uvs: uvs[bucket]) else { continue }
+                let material: Material = texture.map { starMaterial(tint: bucketColors[bucket], texture: $0) }
+                    ?? UnlitMaterial(color: bucketColors[bucket])
+                root.addChild(ModelEntity(mesh: mesh, materials: [material]))
+            }
+        }
+
+        addBuckets(vertices: glowV, indices: glowI, uvs: glowUV, texture: glowTexture, tag: "stars")
+        addBuckets(vertices: spikeV, indices: spikeI, uvs: spikeUV, texture: spikeTexture, tag: "starsBright")
         return root
     }
 
@@ -175,10 +248,14 @@ enum SkySceneBuilder {
         return root
     }
 
-    /// Labels for named bright stars (down to a magnitude cut).
-    static func buildStarLabels(stars: [Star], magnitudeCut: Double = 2.2) -> Entity {
+    /// Labels for named stars down to a magnitude cut. Returns the parent
+    /// entity plus each label paired with its star magnitude, so the renderer
+    /// can declutter by revealing fainter labels only as the view zooms in.
+    static func buildStarLabels(stars: [Star], magnitudeCut: Double = 3.5)
+        -> (root: Entity, tiers: [(entity: Entity, magnitude: Double)]) {
         let root = Entity()
         root.name = "starLabels"
+        var tiers: [(entity: Entity, magnitude: Double)] = []
         for star in stars where star.visualMagnitude <= magnitudeCut && star.properName != nil {
             let direction = equatorialVector(star.equatorialJ2000)
             let label = makeLabel(text: star.name,
@@ -187,6 +264,198 @@ enum SkySceneBuilder {
             // Offset the label slightly below the star.
             place(label: label, at: direction * sphereRadius, verticalOffset: -1.6)
             root.addChild(label)
+            tiers.append((label, star.visualMagnitude))
+        }
+        return (root, tiers)
+    }
+
+    // MARK: Milky Way
+
+    /// ICRS(J2000) → Galactic rotation (Hipparcos, ESA 1997). We use its
+    /// transpose to place galactic-frame points into the equatorial mesh frame.
+    private static let galacticToEquatorial: simd_double3x3 = {
+        let toGalactic = simd_double3x3(rows: [
+            SIMD3(-0.0548755604, -0.8734370902, -0.4838350155),
+            SIMD3( 0.4941094279, -0.4448296300,  0.7469822445),
+            SIMD3(-0.8676661490, -0.1980763734,  0.4559837762),
+        ])
+        return toGalactic.transpose
+    }()
+
+    /// Equatorial-mesh unit vector for a galactic coordinate (l, b).
+    private static func galacticVector(longitude l: Double, latitudeDegrees b: Double) -> SIMD3<Float> {
+        let br = b * AstroMath.degToRad
+        let g = SIMD3<Double>(cos(br) * cos(l), cos(br) * sin(l), sin(br))
+        let e = galacticToEquatorial * g
+        return SIMD3(Float(e.x), Float(e.y), Float(e.z))
+    }
+
+    /// Soft band texture: transparent at the edges, brightest at the galactic
+    /// equator (mapped to the V axis), giving brightness falloff with latitude.
+    private static let milkyWayTexture: TextureResource? = {
+        let width = 8, height = 128
+        let renderer = UIGraphicsImageRenderer(size: CGSize(width: width, height: height))
+        let image = renderer.image { context in
+            let space = CGColorSpaceCreateDeviceRGB()
+            let tint = UIColor(red: 0.72, green: 0.78, blue: 0.95, alpha: 1)
+            let gradient = CGGradient(colorsSpace: space,
+                                      colors: [tint.withAlphaComponent(0.0).cgColor,
+                                               tint.withAlphaComponent(0.10).cgColor,
+                                               tint.withAlphaComponent(0.28).cgColor,
+                                               tint.withAlphaComponent(0.10).cgColor,
+                                               tint.withAlphaComponent(0.0).cgColor] as CFArray,
+                                      locations: [0, 0.32, 0.5, 0.68, 1])!
+            context.cgContext.drawLinearGradient(gradient,
+                                                 start: CGPoint(x: 0, y: 0),
+                                                 end: CGPoint(x: 0, y: height),
+                                                 options: [])
+        }
+        guard let cgImage = image.cgImage else { return nil }
+        return try? TextureResource(image: cgImage, withName: "milkyWay",
+                                    options: .init(semantic: .color))
+    }()
+
+    /// Translucent Milky Way ribbon along the galactic plane (±14° of galactic
+    /// latitude), rendered just inside the star sphere.
+    static func buildMilkyWay() -> Entity {
+        let root = Entity()
+        root.name = "milkyWay"
+        let steps = 240
+        let halfWidth = 14.0
+        let radius = sphereRadius * 0.985
+        var vertices: [SIMD3<Float>] = []
+        var uvs: [SIMD2<Float>] = []
+        var indices: [UInt32] = []
+
+        for i in 0...steps {
+            let l = Double(i) / Double(steps) * 2 * .pi
+            let u = Float(i) / Float(steps)
+            vertices.append(galacticVector(longitude: l, latitudeDegrees: halfWidth) * radius)
+            uvs.append(SIMD2(u, 0))
+            vertices.append(galacticVector(longitude: l, latitudeDegrees: -halfWidth) * radius)
+            uvs.append(SIMD2(u, 1))
+        }
+        for i in 0..<steps {
+            let a = UInt32(i * 2), b = a + 1, c = a + 2, d = a + 3
+            // Both windings so the band shows regardless of view side.
+            indices.append(contentsOf: [a, b, c, b, d, c, a, c, b, b, c, d])
+        }
+
+        if let mesh = makeMesh(name: "milkyWayBand", vertices: vertices, indices: indices, uvs: uvs) {
+            let material: Material = milkyWayTexture.map {
+                var m = UnlitMaterial(color: .white)
+                m.color = .init(tint: .white, texture: .init($0))
+                m.blending = .transparent(opacity: .init(floatLiteral: 1.0))
+                return m
+            } ?? {
+                var m = UnlitMaterial(color: UIColor(red: 0.72, green: 0.78, blue: 0.95, alpha: 1))
+                m.blending = .transparent(opacity: .init(floatLiteral: 0.2))
+                return m
+            }()
+            root.addChild(ModelEntity(mesh: mesh, materials: [material]))
+        }
+        return root
+    }
+
+    // MARK: Reference lines (equator, ecliptic, RA/Dec grid)
+
+    /// J2000 Julian Date, used to define the equator/ecliptic in the mesh frame.
+    private static let j2000: Double = 2_451_545.0
+
+    /// Sample a closed great/small circle as scene-space points.
+    private static func circlePoints(steps: Int = 180,
+                                     _ coordinate: (Double) -> EquatorialCoordinates) -> [SIMD3<Float>] {
+        (0..<steps).map { i in
+            equatorialVector(coordinate(Double(i) / Double(steps) * 2 * .pi))
+        }
+    }
+
+    /// Append line segments joining consecutive points (closed if `closed`).
+    private static func appendPolyline(_ points: [SIMD3<Float>], width: Float, closed: Bool,
+                                       vertices: inout [SIMD3<Float>], indices: inout [UInt32]) {
+        guard points.count > 1 else { return }
+        let last = closed ? points.count : points.count - 1
+        for i in 0..<last {
+            appendSegment(from: points[i] * sphereRadius,
+                          to: points[(i + 1) % points.count] * sphereRadius,
+                          width: width, vertices: &vertices, indices: &indices)
+        }
+    }
+
+    /// Celestial equator (declination 0) with an "Equator" label.
+    static func buildCelestialEquator() -> Entity {
+        let root = Entity()
+        root.name = "celestialEquator"
+        let color = UIColor(red: 0.45, green: 0.85, blue: 0.95, alpha: 1)
+        var vertices: [SIMD3<Float>] = []
+        var indices: [UInt32] = []
+        let points = circlePoints { ra in EquatorialCoordinates(rightAscension: ra, declination: 0) }
+        appendPolyline(points, width: 0.11, closed: true, vertices: &vertices, indices: &indices)
+        if let mesh = makeMesh(name: "equator", vertices: vertices, indices: indices) {
+            var material = UnlitMaterial(color: color)
+            material.blending = .transparent(opacity: .init(floatLiteral: 0.55))
+            root.addChild(ModelEntity(mesh: mesh, materials: [material]))
+        }
+        let label = makeLabel(text: "EQUATOR", color: color.withAlphaComponent(0.9), size: 1.6)
+        place(label: label, at: equatorialVector(EquatorialCoordinates(raHours: 3, decDegrees: 0)) * sphereRadius,
+              verticalOffset: 1.4)
+        root.addChild(label)
+        return root
+    }
+
+    /// Ecliptic (the Sun's apparent path), tilted by the J2000 obliquity, with
+    /// an "Ecliptic" label.
+    static func buildEcliptic() -> Entity {
+        let root = Entity()
+        root.name = "ecliptic"
+        let color = UIColor(red: 1.0, green: 0.82, blue: 0.38, alpha: 1)
+        var vertices: [SIMD3<Float>] = []
+        var indices: [UInt32] = []
+        let points = circlePoints { lambda in
+            CoordinateTransforms.eclipticToEquatorial(
+                EclipticCoordinates(longitude: lambda, latitude: 0), julianDate: j2000)
+        }
+        appendPolyline(points, width: 0.13, closed: true, vertices: &vertices, indices: &indices)
+        if let mesh = makeMesh(name: "ecliptic", vertices: vertices, indices: indices) {
+            var material = UnlitMaterial(color: color)
+            material.blending = .transparent(opacity: .init(floatLiteral: 0.6))
+            root.addChild(ModelEntity(mesh: mesh, materials: [material]))
+        }
+        let labelEquatorial = CoordinateTransforms.eclipticToEquatorial(
+            EclipticCoordinates(longitude: 90 * AstroMath.degToRad, latitude: 0), julianDate: j2000)
+        let label = makeLabel(text: "ECLIPTIC", color: color.withAlphaComponent(0.9), size: 1.6)
+        place(label: label, at: equatorialVector(labelEquatorial) * sphereRadius, verticalOffset: 1.4)
+        root.addChild(label)
+        return root
+    }
+
+    /// RA/Dec grid: meridians every 2h and parallels every 15°, thin lines.
+    static func buildCoordinateGrid() -> Entity {
+        let root = Entity()
+        root.name = "coordinateGrid"
+        let color = UIColor(white: 0.7, alpha: 1)
+        var vertices: [SIMD3<Float>] = []
+        var indices: [UInt32] = []
+
+        // Meridians: RA = 0h, 2h, … 22h, from −80° to +80° declination.
+        for hour in stride(from: 0.0, to: 24.0, by: 2.0) {
+            let points: [SIMD3<Float>] = stride(from: -80.0, through: 80.0, by: 5.0).map { dec in
+                equatorialVector(EquatorialCoordinates(raHours: hour, decDegrees: dec))
+            }
+            appendPolyline(points, width: 0.055, closed: false, vertices: &vertices, indices: &indices)
+        }
+        // Parallels: Dec = ±15°, ±30°, … ±75° (equator handled separately).
+        for dec in stride(from: -75.0, through: 75.0, by: 15.0) where dec != 0 {
+            let points = circlePoints(steps: 120) { ra in
+                EquatorialCoordinates(rightAscension: ra, declination: dec * AstroMath.degToRad)
+            }
+            appendPolyline(points, width: 0.055, closed: true, vertices: &vertices, indices: &indices)
+        }
+
+        if let mesh = makeMesh(name: "radecGrid", vertices: vertices, indices: indices) {
+            var material = UnlitMaterial(color: color)
+            material.blending = .transparent(opacity: .init(floatLiteral: 0.28))
+            root.addChild(ModelEntity(mesh: mesh, materials: [material]))
         }
         return root
     }
@@ -204,11 +473,15 @@ enum SkySceneBuilder {
         }
     }
 
-    /// Ring-style markers for Messier objects, with labels for named ones.
-    static func buildDeepSkyMarkers() -> Entity {
+    /// Ring-style markers for Messier objects. Every object gets a designation
+    /// label; "primary" ones (named or bright) show whenever deep-sky is on,
+    /// while the rest are returned as `secondaryLabels` for the renderer to
+    /// reveal only when the view is zoomed in.
+    static func buildDeepSkyMarkers() -> (root: Entity, secondaryLabels: [Entity]) {
         let root = Entity()
         root.name = "deepSky"
-        for object in MessierCatalog.objects where object.visualMagnitude <= deepSkyMagnitudeCut {
+        var secondaryLabels: [Entity] = []
+        for object in SkyCatalog.allDeepSky where object.visualMagnitude <= deepSkyMagnitudeCut {
             let direction = equatorialVector(object.equatorialJ2000)
             let color = deepSkyColor(for: object.type)
 
@@ -228,13 +501,16 @@ enum SkySceneBuilder {
                 root.addChild(marker)
             }
 
-            if object.commonName != nil || object.visualMagnitude <= 6.5 {
-                let label = makeLabel(text: object.designation, color: color.withAlphaComponent(0.9), size: 1.2)
-                place(label: label, at: direction * sphereRadius, verticalOffset: -1.8)
-                root.addChild(label)
+            let label = makeLabel(text: object.designation, color: color.withAlphaComponent(0.9), size: 1.2)
+            place(label: label, at: direction * sphereRadius, verticalOffset: -1.8)
+            let isPrimary = object.commonName != nil || object.visualMagnitude <= 6.5
+            if !isPrimary {
+                label.isEnabled = false
+                secondaryLabels.append(label)
             }
+            root.addChild(label)
         }
-        return root
+        return (root, secondaryLabels)
     }
 
     // MARK: Solar system markers
@@ -334,6 +610,70 @@ enum SkySceneBuilder {
         return root
     }
 
+    // MARK: Horizon light-pollution glow
+
+    /// Warm vertical gradient: opaque near the horizon, transparent higher up.
+    private static let horizonGlowTexture: TextureResource? = {
+        let width = 8, height = 128
+        let renderer = UIGraphicsImageRenderer(size: CGSize(width: width, height: height))
+        let image = renderer.image { context in
+            let space = CGColorSpaceCreateDeviceRGB()
+            let tint = UIColor(red: 0.55, green: 0.45, blue: 0.34, alpha: 1)   // sodium-glow warm
+            let gradient = CGGradient(colorsSpace: space,
+                                      colors: [tint.withAlphaComponent(0.0).cgColor,
+                                               tint.withAlphaComponent(0.12).cgColor,
+                                               tint.withAlphaComponent(0.6).cgColor] as CFArray,
+                                      locations: [0, 0.55, 1])!
+            // v=0 (top, faint) → v=1 (bottom, near horizon, strong).
+            context.cgContext.drawLinearGradient(gradient,
+                                                 start: CGPoint(x: 0, y: 0),
+                                                 end: CGPoint(x: 0, y: height),
+                                                 options: [])
+        }
+        guard let cgImage = image.cgImage else { return nil }
+        return try? TextureResource(image: cgImage, withName: "horizonGlow",
+                                    options: .init(semantic: .color))
+    }()
+
+    /// Skirt of geometry hugging the horizon (world frame, just inside the star
+    /// sphere so it washes over low stars). Opacity is driven by the renderer
+    /// from the Bortle class to simulate light-pollution glow and extinction.
+    static func buildHorizonGlow() -> Entity {
+        let root = Entity()
+        root.name = "horizonGlow"
+        let radius = sphereRadius * 0.93
+        let steps = 96
+        let topAltitude = 32.0 * AstroMath.degToRad
+        let bottomAltitude = -3.0 * AstroMath.degToRad
+        var vertices: [SIMD3<Float>] = []
+        var uvs: [SIMD2<Float>] = []
+        var indices: [UInt32] = []
+
+        for i in 0...steps {
+            let azimuth = Double(i) / Double(steps) * 2 * .pi
+            let u = Float(i) / Float(steps)
+            vertices.append(sceneDirection(horizontal:
+                HorizontalCoordinates(altitude: topAltitude, azimuth: azimuth)) * radius)
+            uvs.append(SIMD2(u, 0))
+            vertices.append(sceneDirection(horizontal:
+                HorizontalCoordinates(altitude: bottomAltitude, azimuth: azimuth)) * radius)
+            uvs.append(SIMD2(u, 1))
+        }
+        for i in 0..<steps {
+            let a = UInt32(i * 2), b = a + 1, c = a + 2, d = a + 3
+            indices.append(contentsOf: [a, b, c, b, d, c, a, c, b, b, c, d])
+        }
+
+        if let mesh = makeMesh(name: "horizonGlow", vertices: vertices, indices: indices, uvs: uvs),
+           let texture = horizonGlowTexture {
+            var material = UnlitMaterial(color: .white)
+            material.color = .init(tint: .white, texture: .init(texture))
+            material.blending = .transparent(opacity: .init(floatLiteral: 1.0))
+            root.addChild(ModelEntity(mesh: mesh, materials: [material]))
+        }
+        return root
+    }
+
     // MARK: Selection highlight
 
     static func buildSelectionHighlight() -> Entity {
@@ -366,19 +706,87 @@ enum SkySceneBuilder {
         return holder
     }
 
+    // MARK: Satellite track
+
+    /// Build the predicted sky-track polyline (world frame) from sampled
+    /// scene-space points — `nil` entries are below the horizon and break the
+    /// line. Adds an arrowhead at the leading (last valid) point.
+    static func buildSatelliteTrack(points: [SIMD3<Float>?], color: UIColor) -> Entity {
+        let root = Entity()
+        root.name = "satelliteTrack"
+        var vertices: [SIMD3<Float>] = []
+        var indices: [UInt32] = []
+
+        for k in 0..<max(0, points.count - 1) {
+            guard let a = points[k], let b = points[k + 1] else { continue }
+            appendSegment(from: a, to: b, width: 0.45, vertices: &vertices, indices: &indices)
+        }
+
+        // Arrowhead: a small chevron at the leading end, opening backward along
+        // the direction of motion.
+        let valid = points.compactMap { $0 }
+        if valid.count >= 2 {
+            let tip = valid[valid.count - 1]
+            let prev = valid[valid.count - 2]
+            let motion = simd_normalize(tip - prev)
+            let radial = simd_normalize(tip)
+            let side = simd_normalize(simd_cross(radial, motion))
+            let back = tip - motion * 2.4
+            appendSegment(from: tip, to: back + side * 1.4, width: 0.5, vertices: &vertices, indices: &indices)
+            appendSegment(from: tip, to: back - side * 1.4, width: 0.5, vertices: &vertices, indices: &indices)
+        }
+
+        if let mesh = makeMesh(name: "satTrack", vertices: vertices, indices: indices) {
+            var material = UnlitMaterial(color: color)
+            material.blending = .transparent(opacity: .init(floatLiteral: 0.85))
+            root.addChild(ModelEntity(mesh: mesh, materials: [material]))
+        }
+        return root
+    }
+
+    // MARK: Meteor-shower radiants
+
+    /// Labeled radiant markers (equatorial mesh frame) for active showers.
+    static func buildMeteorRadiants(_ showers: [MeteorShower]) -> Entity {
+        let root = Entity()
+        root.name = "meteorRadiants"
+        let color = UIColor(red: 1.0, green: 0.85, blue: 0.5, alpha: 1)
+        for shower in showers {
+            let direction = equatorialVector(shower.radiant)
+            let holder = Entity()
+            let burst = ModelEntity(mesh: .generateSphere(radius: 0.8),
+                                    materials: [UnlitMaterial(color: color)])
+            holder.addChild(burst)
+            let label = makeLabel(text: "\(shower.name) radiant", color: color, size: 1.4)
+            label.position = SIMD3(0, -1.8, 0)
+            holder.addChild(label)
+            holder.position = direction * (sphereRadius * 0.92)
+            orientTowardCenter(holder, at: holder.position)
+            root.addChild(holder)
+        }
+        return root
+    }
+
     // MARK: - Mesh primitives
 
-    static func makeMesh(name: String, vertices: [SIMD3<Float>], indices: [UInt32]) -> MeshResource? {
+    static func makeMesh(name: String, vertices: [SIMD3<Float>], indices: [UInt32],
+                         uvs: [SIMD2<Float>]? = nil) -> MeshResource? {
         guard !vertices.isEmpty else { return nil }
         var descriptor = MeshDescriptor(name: name)
         descriptor.positions = MeshBuffers.Positions(vertices)
+        if let uvs, uvs.count == vertices.count {
+            descriptor.textureCoordinates = MeshBuffers.TextureCoordinates(uvs)
+        }
         descriptor.primitives = .triangles(indices)
         return try? MeshResource.generate(from: [descriptor])
     }
 
-    /// Quad tangent to the sphere, facing the origin.
+    /// Quad tangent to the sphere, facing the origin. When a `uvs` buffer is
+    /// supplied, the four corners receive [0,1]² texture coordinates so the
+    /// quad can carry a sprite (e.g. the round star glow).
     static func appendQuad(center: SIMD3<Float>, radialDirection: SIMD3<Float>, halfSize: Float,
-                           vertices: inout [SIMD3<Float>], indices: inout [UInt32]) {
+                           vertices: inout [SIMD3<Float>], indices: inout [UInt32],
+                           uvs: inout [SIMD2<Float>]) {
         let reference: SIMD3<Float> = abs(radialDirection.z) > 0.98 ? SIMD3(1, 0, 0) : SIMD3(0, 0, 1)
         let t1 = simd_normalize(simd_cross(radialDirection, reference))
         let t2 = simd_normalize(simd_cross(radialDirection, t1))
@@ -387,9 +795,18 @@ enum SkySceneBuilder {
         vertices.append(center + t1 * halfSize - t2 * halfSize)
         vertices.append(center + t1 * halfSize + t2 * halfSize)
         vertices.append(center - t1 * halfSize + t2 * halfSize)
+        uvs.append(contentsOf: [SIMD2(0, 1), SIMD2(1, 1), SIMD2(1, 0), SIMD2(0, 0)])
         // Both windings so the quad is visible regardless of face culling.
         indices.append(contentsOf: [base, base + 1, base + 2, base, base + 2, base + 3,
                                     base, base + 2, base + 1, base, base + 3, base + 2])
+    }
+
+    /// Overload without texture coordinates (used by non-sprite callers).
+    static func appendQuad(center: SIMD3<Float>, radialDirection: SIMD3<Float>, halfSize: Float,
+                           vertices: inout [SIMD3<Float>], indices: inout [UInt32]) {
+        var discard: [SIMD2<Float>] = []
+        appendQuad(center: center, radialDirection: radialDirection, halfSize: halfSize,
+                   vertices: &vertices, indices: &indices, uvs: &discard)
     }
 
     /// Straight thin quad between two points (short segments only).

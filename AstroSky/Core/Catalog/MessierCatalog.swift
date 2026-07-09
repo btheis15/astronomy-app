@@ -20,9 +20,15 @@ enum DeepSkyType: String, Sendable, CaseIterable {
     case asterism = "Asterism"
 }
 
+/// Which deep-sky catalog an object comes from.
+enum DeepSkyCatalog: Sendable {
+    case messier, caldwell, ngc
+}
+
 struct DeepSkyObject: CelestialObject, Identifiable, Sendable {
-    /// Messier number (1–110).
-    let messierNumber: Int
+    let catalog: DeepSkyCatalog
+    /// Number within its catalog (Messier 1–110, Caldwell 1–109, or NGC number).
+    let catalogNumber: Int
     let commonName: String?
     let type: DeepSkyType
     let constellationAbbreviation: String
@@ -30,9 +36,11 @@ struct DeepSkyObject: CelestialObject, Identifiable, Sendable {
     let decDegrees: Double
     let visualMagnitude: Double
 
+    /// Messier initializer (positional, matches the existing catalog rows).
     init(_ number: Int, _ name: String?, _ type: DeepSkyType, _ con: String,
          _ ra: Double, _ dec: Double, _ mag: Double) {
-        self.messierNumber = number
+        self.catalog = .messier
+        self.catalogNumber = number
         self.commonName = name
         self.type = type
         self.constellationAbbreviation = con
@@ -41,10 +49,40 @@ struct DeepSkyObject: CelestialObject, Identifiable, Sendable {
         self.visualMagnitude = mag
     }
 
+    /// General initializer for any catalog.
+    init(catalog: DeepSkyCatalog, number: Int, name: String?, type: DeepSkyType,
+         constellation con: String, raHours ra: Double, decDegrees dec: Double, magnitude mag: Double) {
+        self.catalog = catalog
+        self.catalogNumber = number
+        self.commonName = name
+        self.type = type
+        self.constellationAbbreviation = con
+        self.raHours = ra
+        self.decDegrees = dec
+        self.visualMagnitude = mag
+    }
+
+    /// Back-compatible Messier number accessor (used by tests / Messier code).
+    var messierNumber: Int { catalogNumber }
+
     // MARK: CelestialObject
 
-    var id: String { String(format: "m%03d", messierNumber) }
-    var designation: String { "M\(messierNumber)" }
+    var id: String {
+        switch catalog {
+        case .messier: return String(format: "m%03d", catalogNumber)
+        case .caldwell: return String(format: "c%03d", catalogNumber)
+        case .ngc: return "ngc\(catalogNumber)"
+        }
+    }
+
+    var designation: String {
+        switch catalog {
+        case .messier: return "M\(catalogNumber)"
+        case .caldwell: return "C\(catalogNumber)"
+        case .ngc: return "NGC \(catalogNumber)"
+        }
+    }
+
     var name: String { commonName.map { "\(designation) · \($0)" } ?? designation }
 
     var subtitle: String {

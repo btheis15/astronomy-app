@@ -64,6 +64,15 @@ enum ConstellationCatalog {
         "Sco": "Scorpius", "Sct": "Scutum", "Ser": "Serpens", "Tau": "Taurus",
         "TrA": "Triangulum Australe", "Tri": "Triangulum", "UMa": "Ursa Major",
         "UMi": "Ursa Minor", "Vel": "Vela", "Vir": "Virgo", "Vul": "Vulpecula",
+        // Remaining IAU constellations (used by the Caldwell / NGC catalogs).
+        "Ant": "Antlia", "Aps": "Apus", "Ara": "Ara", "Cae": "Caelum",
+        "Cam": "Camelopardalis", "Cha": "Chamaeleon", "Cir": "Circinus", "Col": "Columba",
+        "CrA": "Corona Australis", "Crt": "Crater", "Equ": "Equuleus", "For": "Fornax",
+        "Hor": "Horologium", "Hyi": "Hydrus", "Ind": "Indus", "Lac": "Lacerta",
+        "LMi": "Leo Minor", "Lup": "Lupus", "Lyn": "Lynx", "Men": "Mensa",
+        "Mic": "Microscopium", "Mus": "Musca", "Nor": "Norma", "Oct": "Octans",
+        "Pic": "Pictor", "Pyx": "Pyxis", "Ret": "Reticulum", "Scl": "Sculptor",
+        "Sex": "Sextans", "Tel": "Telescopium", "Tuc": "Tucana", "Vol": "Volans",
     ]
 
     static let constellations: [Constellation] = [

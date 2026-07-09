@@ -27,10 +27,19 @@ struct CatalogView: View {
                         Label("Bright Stars", systemImage: "star.fill")
                     }
                     NavigationLink {
-                        ObjectListView(title: "Messier Objects",
-                                       objects: appState.catalog.deepSky)
+                        ObjectListView(title: "Messier Objects", objects: MessierCatalog.objects)
                     } label: {
                         Label("Messier Objects", systemImage: "sparkles")
+                    }
+                    NavigationLink {
+                        ObjectListView(title: "Caldwell Objects", objects: CaldwellCatalog.objects)
+                    } label: {
+                        Label("Caldwell Objects", systemImage: "sparkles")
+                    }
+                    NavigationLink {
+                        ObjectListView(title: "NGC Highlights", objects: NGCHighlights.objects)
+                    } label: {
+                        Label("NGC Highlights", systemImage: "sparkles")
                     }
                     NavigationLink {
                         ConstellationListView()

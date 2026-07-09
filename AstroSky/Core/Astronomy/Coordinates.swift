@@ -102,9 +102,20 @@ enum CoordinateTransforms {
         return degrees * AstroMath.degToRad
     }
 
-    /// Convert geocentric ecliptic to equatorial coordinates (Meeus eq. 13.3, 13.4).
+    /// True obliquity of the ecliptic (mean obliquity + nutation in obliquity).
+    static func trueObliquity(julianDate jd: Double) -> Double {
+        meanObliquity(julianDate: jd) + Nutation.nutation(julianDate: jd).obliquity
+    }
+
+    /// Convert geocentric ecliptic to equatorial coordinates using the mean
+    /// obliquity of date (Meeus eq. 13.3, 13.4).
     static func eclipticToEquatorial(_ ecl: EclipticCoordinates, julianDate jd: Double) -> EquatorialCoordinates {
-        let eps = meanObliquity(julianDate: jd)
+        eclipticToEquatorial(ecl, obliquity: meanObliquity(julianDate: jd))
+    }
+
+    /// Convert geocentric ecliptic to equatorial coordinates with an explicit
+    /// obliquity (e.g. the true obliquity for apparent places).
+    static func eclipticToEquatorial(_ ecl: EclipticCoordinates, obliquity eps: Double) -> EquatorialCoordinates {
         let sinEps = sin(eps), cosEps = cos(eps)
         let sinLambda = sin(ecl.longitude), cosLambda = cos(ecl.longitude)
         let sinBeta = sin(ecl.latitude), cosBeta = cos(ecl.latitude)

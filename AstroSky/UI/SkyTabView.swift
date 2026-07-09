@@ -64,7 +64,17 @@ struct SkyTabView: View {
         HStack(spacing: 12) {
             locationBadge
 
+            if let accuracy = appState.locationService.headingAccuracy {
+                headingChip(accuracy: accuracy)
+            }
+
             Spacer()
+
+            if appState.hasAlignmentOffset {
+                hudButton(systemImage: "arrow.counterclockwise") {
+                    withAnimation(.snappy) { appState.resetAlignment() }
+                }
+            }
 
             if !appState.isLiveTime {
                 Button {
@@ -104,6 +114,23 @@ struct SkyTabView: View {
         .padding(.horizontal, 10)
         .padding(.vertical, 6)
         .background(.ultraThinMaterial, in: Capsule())
+    }
+
+    /// Compass heading-accuracy chip: green when well-calibrated, amber/red as
+    /// it degrades. Tapping isn't needed — it's a passive calibration cue.
+    private func headingChip(accuracy: Double) -> some View {
+        let color: Color = accuracy <= 15 ? .green : (accuracy <= 30 ? .yellow : .red)
+        return HStack(spacing: 4) {
+            Image(systemName: "safari")
+            Text("±\(Int(accuracy.rounded()))°")
+                .monospacedDigit()
+        }
+        .font(.caption2.weight(.semibold))
+        .foregroundStyle(color)
+        .padding(.horizontal, 8)
+        .padding(.vertical, 6)
+        .background(.ultraThinMaterial, in: Capsule())
+        .accessibilityLabel("Compass accuracy plus or minus \(Int(accuracy.rounded())) degrees")
     }
 
     private func hudButton(systemImage: String, action: @escaping () -> Void) -> some View {

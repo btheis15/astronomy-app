@@ -139,7 +139,15 @@ enum MoonEphemeris {
         let distance = 385_000.56 + sumR / 1000.0
 
         let ecliptic = EclipticCoordinates(longitude: longitude, latitude: latitude)
-        let equatorial = CoordinateTransforms.eclipticToEquatorial(ecliptic, julianDate: jd)
+
+        // Apparent equatorial place: add nutation in longitude and convert with
+        // the true obliquity. (The Moon is close enough that annual aberration
+        // is negligible here.) The `ecliptic` field stays geometric.
+        let nutation = Nutation.nutation(julianDate: jd)
+        let apparentEcliptic = EclipticCoordinates(longitude: longitude + nutation.longitude,
+                                                   latitude: latitude)
+        let equatorial = CoordinateTransforms.eclipticToEquatorial(
+            apparentEcliptic, obliquity: CoordinateTransforms.trueObliquity(julianDate: jd))
         return Position(ecliptic: ecliptic, equatorial: equatorial, distanceKm: distance)
     }
 

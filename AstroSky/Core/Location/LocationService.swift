@@ -7,6 +7,7 @@
 
 import CoreLocation
 import Foundation
+import MapKit
 import Observation
 
 @MainActor
@@ -17,13 +18,15 @@ final class LocationService: NSObject, CLLocationManagerDelegate {
     private(set) var observer: Observer = Observer.default
     private(set) var authorizationStatus: CLAuthorizationStatus = .notDetermined
     private(set) var placeName: String?
+    /// Compass heading accuracy in degrees (± value), or nil when heading is
+    /// unavailable or uncalibrated. Small values mean a well-calibrated compass.
+    private(set) var headingAccuracy: Double?
     /// True when `observer` came from an actual fix or manual entry.
     private(set) var hasRealLocation = false
     /// When set, GPS updates are ignored.
     var manualLocationEnabled = false
 
     private let manager = CLLocationManager()
-    private let geocoder = CLGeocoder()
 
     override init() {
         super.init()
@@ -37,9 +40,16 @@ final class LocationService: NSObject, CLLocationManagerDelegate {
             manager.requestWhenInUseAuthorization()
         case .authorizedWhenInUse, .authorizedAlways:
             manager.requestLocation()
+            startHeadingIfAvailable()
         default:
             break
         }
+    }
+
+    private func startHeadingIfAvailable() {
+        guard CLLocationManager.headingAvailable() else { return }
+        manager.headingFilter = 1
+        manager.startUpdatingHeading()
     }
 
     func setManualLocation(latitudeDegrees: Double, longitudeDegrees: Double, name: String? = nil) {
@@ -62,6 +72,7 @@ final class LocationService: NSObject, CLLocationManagerDelegate {
             self.authorizationStatus = status
             if status == .authorizedWhenInUse || status == .authorizedAlways {
                 self.manager.requestLocation()
+                self.startHeadingIfAvailable()
             }
         }
     }
@@ -74,7 +85,7 @@ final class LocationService: NSObject, CLLocationManagerDelegate {
                                      longitudeDegrees: location.coordinate.longitude,
                                      altitude: location.altitude)
             self.hasRealLocation = true
-            self.reverseGeocode(location)
+            await self.reverseGeocode(location)
         }
     }
 
@@ -82,12 +93,20 @@ final class LocationService: NSObject, CLLocationManagerDelegate {
         // Keep the default/last observer; astronomy still works.
     }
 
-    private func reverseGeocode(_ location: CLLocation) {
-        geocoder.reverseGeocodeLocation(location) { [weak self] placemarks, _ in
-            guard let self, let placemark = placemarks?.first else { return }
-            Task { @MainActor in
-                self.placeName = placemark.locality ?? placemark.administrativeArea ?? placemark.name
-            }
+    nonisolated func locationManager(_ manager: CLLocationManager, didUpdateHeading newHeading: CLHeading) {
+        // Negative accuracy means the heading is invalid/uncalibrated.
+        let accuracy = newHeading.headingAccuracy
+        Task { @MainActor in
+            self.headingAccuracy = accuracy >= 0 ? accuracy : nil
         }
+    }
+
+    private func reverseGeocode(_ location: CLLocation) async {
+        guard let request = MKReverseGeocodingRequest(location: location),
+              let mapItems = try? await request.mapItems,
+              let item = mapItems.first else { return }
+        placeName = item.addressRepresentations?.cityName
+            ?? item.addressRepresentations?.cityWithContext
+            ?? item.name
     }
 }

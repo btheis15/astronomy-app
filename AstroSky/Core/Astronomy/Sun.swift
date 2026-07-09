@@ -44,7 +44,16 @@ enum SunEphemeris {
 
         let lambda = AstroMath.normalizedDegrees(trueLongitude) * AstroMath.degToRad
         let ecliptic = EclipticCoordinates(longitude: lambda, latitude: 0)
-        let equatorial = CoordinateTransforms.eclipticToEquatorial(ecliptic, julianDate: jd)
+
+        // Apparent equatorial place: add nutation in longitude and annual
+        // aberration (−20.4898″ / R, Meeus ch. 25), then convert with the true
+        // obliquity. The `ecliptic` field stays geometric (mean of date).
+        let nutation = Nutation.nutation(julianDate: jd)
+        let aberration = -20.4898 / distance / 3600.0 * AstroMath.degToRad
+        let apparentLambda = lambda + nutation.longitude + aberration
+        let apparentEcliptic = EclipticCoordinates(longitude: apparentLambda, latitude: 0)
+        let equatorial = CoordinateTransforms.eclipticToEquatorial(
+            apparentEcliptic, obliquity: CoordinateTransforms.trueObliquity(julianDate: jd))
         return Position(ecliptic: ecliptic, equatorial: equatorial, distanceAU: distance)
     }
 }
