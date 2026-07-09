@@ -34,6 +34,32 @@ final class AppState {
 
     func resetToLiveTime() { timeOffset = 0 }
 
+    // MARK: Favorites (any object)
+
+    var favoriteObjectIDs: Set<String> {
+        get {
+            access(keyPath: \.favoriteObjectIDs)
+            return Set(UserDefaults.standard.stringArray(forKey: "favoriteObjectIDs") ?? [])
+        }
+        set {
+            withMutation(keyPath: \.favoriteObjectIDs) {
+                UserDefaults.standard.set(Array(newValue), forKey: "favoriteObjectIDs")
+            }
+        }
+    }
+
+    func isFavorite(_ id: String) -> Bool { favoriteObjectIDs.contains(id) }
+
+    func toggleFavorite(_ id: String) {
+        var favorites = favoriteObjectIDs
+        if favorites.contains(id) { favorites.remove(id) } else { favorites.insert(id) }
+        favoriteObjectIDs = favorites
+    }
+
+    var favoriteObjects: [any CelestialObject] {
+        favoriteObjectIDs.sorted().compactMap { object(withID: $0) }
+    }
+
     // MARK: Onboarding
 
     /// True once the first-launch onboarding flow has been completed or skipped.

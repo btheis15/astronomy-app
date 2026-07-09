@@ -3,6 +3,7 @@
 //  AstroSky
 //
 
+import SwiftData
 import SwiftUI
 
 @main
@@ -15,6 +16,7 @@ struct AstroSkyApp: App {
             RootView()
                 .environment(appState)
                 .preferredColorScheme(.dark)
+                .modelContainer(for: ObservationLogEntry.self)
                 .task { appState.start() }
                 .onChange(of: scenePhase) { _, phase in
                     if phase == .active {

@@ -14,6 +14,26 @@ struct CatalogView: View {
     var body: some View {
         NavigationStack {
             List {
+                if !appState.favoriteObjects.isEmpty {
+                    Section("Favorites") {
+                        ForEach(appState.favoriteObjects, id: \.id) { object in
+                            NavigationLink {
+                                ObjectDetailView(object: object)
+                            } label: {
+                                CatalogRow(object: object)
+                            }
+                        }
+                    }
+                }
+
+                Section {
+                    NavigationLink {
+                        ObservationLogView()
+                    } label: {
+                        Label("Observing Log", systemImage: "book.closed")
+                    }
+                }
+
                 Section {
                     NavigationLink {
                         ObjectListView(title: "Solar System", objects: solarSystemObjects)
