@@ -13,6 +13,8 @@ struct SkyARViewContainer: UIViewRepresentable {
     /// Force the drag-to-look mode even when AR is available.
     var preferManualMode: Bool
     var onGuideUpdate: (GuideReadout?) -> Void
+    /// Hands the live renderer back to SwiftUI (for the shutter button).
+    var onRendererReady: (SkyRenderer) -> Void = { _ in }
 
     func makeCoordinator() -> Coordinator {
         Coordinator(appState: appState, preferManualMode: preferManualMode)
@@ -21,6 +23,7 @@ struct SkyARViewContainer: UIViewRepresentable {
     func makeUIView(context: Context) -> ARView {
         let renderer = context.coordinator.renderer
         renderer.onGuideUpdate = onGuideUpdate
+        onRendererReady(renderer)
         return renderer.arView
     }
 

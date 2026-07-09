@@ -182,6 +182,41 @@ final class SkyRenderer: NSObject {
         tick()
     }
 
+    /// Capture the current sky view (camera feed + overlay in AR mode) and
+    /// composite a small "AstroSky · date · place" caption onto it.
+    func captureSnapshot() async -> UIImage? {
+        let base: UIImage? = await withCheckedContinuation { continuation in
+            arView.snapshot(saveToHDR: false) { image in
+                continuation.resume(returning: image)
+            }
+        }
+        guard let base else { return nil }
+
+        let place = appState.locationService.placeName
+            ?? String(format: "%.1f°, %.1f°", appState.observer.latitudeDegrees, appState.observer.longitudeDegrees)
+        let dateText = appState.skyDate.formatted(date: .abbreviated, time: .shortened)
+        let caption = "AstroSky · \(dateText) · \(place)"
+
+        let renderer = UIGraphicsImageRenderer(size: base.size)
+        return renderer.image { context in
+            base.draw(at: .zero)
+            let fontSize = max(14, base.size.width * 0.028)
+            let attributes: [NSAttributedString.Key: Any] = [
+                .font: UIFont.systemFont(ofSize: fontSize, weight: .semibold),
+                .foregroundColor: UIColor.white,
+            ]
+            let textSize = (caption as NSString).size(withAttributes: attributes)
+            let margin = fontSize
+            let box = CGRect(x: margin, y: base.size.height - textSize.height - margin * 1.6,
+                             width: textSize.width + fontSize, height: textSize.height + fontSize * 0.6)
+            let pill = UIBezierPath(roundedRect: box, cornerRadius: box.height / 2)
+            UIColor.black.withAlphaComponent(0.45).setFill()
+            pill.fill()
+            (caption as NSString).draw(at: CGPoint(x: box.minX + fontSize / 2, y: box.minY + fontSize * 0.3),
+                                       withAttributes: attributes)
+        }
+    }
+
     func tearDown() {
         updateTimer?.invalidate()
         updateTimer = nil

@@ -15,17 +15,34 @@ struct SkyTabView: View {
     @State private var preferManualMode = !ARWorldTrackingConfiguration.isSupported
     @State private var showSearch = false
     @State private var showTimeControls = false
+    @State private var renderer: SkyRenderer?
+    @State private var capturedPhoto: CapturedPhoto?
+    @State private var isCapturing = false
 
     var body: some View {
         ZStack {
             SkyARViewContainer(appState: appState,
-                               preferManualMode: preferManualMode) { readout in
-                guide = readout
-            }
+                               preferManualMode: preferManualMode,
+                               onGuideUpdate: { guide = $0 },
+                               onRendererReady: { renderer = $0 })
             .id(preferManualMode)   // rebuild the view when switching modes
             .ignoresSafeArea()
 
             hud
+        }
+        .sheet(item: $capturedPhoto) { photo in
+            ShareSheet(items: [photo.image])
+        }
+    }
+
+    private func capturePhoto() {
+        guard !isCapturing, let renderer else { return }
+        isCapturing = true
+        Task {
+            if let image = await renderer.captureSnapshot() {
+                capturedPhoto = CapturedPhoto(image: image)
+            }
+            isCapturing = false
         }
     }
 
@@ -93,6 +110,9 @@ struct SkyTabView: View {
             hudButton(systemImage: preferManualMode ? "arkit" : "hand.draw") {
                 preferManualMode.toggle()
             }
+            hudButton(systemImage: isCapturing ? "camera.fill" : "camera") {
+                capturePhoto()
+            }
             hudButton(systemImage: "magnifyingglass") {
                 showSearch = true
             }
@@ -142,6 +162,22 @@ struct SkyTabView: View {
         }
         .buttonStyle(.plain)
     }
+}
+
+// MARK: - Photo capture & share
+
+struct CapturedPhoto: Identifiable {
+    let id = UUID()
+    let image: UIImage
+}
+
+/// UIKit share-sheet bridge.
+struct ShareSheet: UIViewControllerRepresentable {
+    let items: [Any]
+    func makeUIViewController(context: Context) -> UIActivityViewController {
+        UIActivityViewController(activityItems: items, applicationActivities: nil)
+    }
+    func updateUIViewController(_ controller: UIActivityViewController, context: Context) {}
 }
 
 // MARK: - Guidance arrow
