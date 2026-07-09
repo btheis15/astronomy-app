@@ -69,6 +69,25 @@ struct SettingsView: View {
                     Text("Tints the whole interface red to protect your dark adaptation.")
                 }
 
+                Section {
+                    NavigationLink {
+                        EquipmentEditorView()
+                    } label: {
+                        Label("Telescope & eyepieces", systemImage: "eyeglasses")
+                    }
+                    if let scope = appState.equipment.activeTelescope,
+                       let eyepiece = appState.equipment.activeEyepiece {
+                        LabeledContent("Active",
+                                       value: "\(scope.name) + \(eyepiece.name)")
+                        LabeledContent("Magnification",
+                                       value: "\(Int(scope.focalLengthMM / eyepiece.focalLengthMM))×")
+                    }
+                } header: {
+                    Text("Telescope")
+                } footer: {
+                    Text("Set up your gear to see what each object looks like through the eyepiece, how hard it is, and how to find it.")
+                }
+
                 locationSection
 
                 Section {
