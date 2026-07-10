@@ -193,9 +193,15 @@ final class SkyRenderer: NSObject {
     /// bundled image, yielding between each so the frame never stalls.
     private func loadDeepSkySprites() async {
         let showpieces = appState.catalog.deepSky
-            .filter { ObjectImagery.hasImage(for: $0) && $0.visualMagnitude <= 9.0 }
-            .sorted { $0.visualMagnitude < $1.visualMagnitude }
-            .prefix(30)
+            .filter { ObjectImagery.hasImage(for: $0) && $0.visualMagnitude <= 10.0 }
+            .sorted { a, b in
+                // Named showpieces (Sombrero, Ring, Whirlpool…) first, then by
+                // brightness, so the most recognizable objects always get a photo.
+                let an = a.commonName != nil, bn = b.commonName != nil
+                if an != bn { return an }
+                return a.visualMagnitude < b.visualMagnitude
+            }
+            .prefix(40)
         for object in showpieces {
             let direction = SkySceneBuilder.equatorialVector(object.equatorialJ2000)
             let size = AngularSizeSource.angularSizeRadians(for: object, julianDate: 2_451_545.0)

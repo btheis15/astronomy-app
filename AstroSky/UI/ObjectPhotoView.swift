@@ -14,6 +14,7 @@ struct ObjectPhotoView: View {
     var maxPixel: CGFloat = 700
 
     @State private var image: UIImage?
+    @State private var didAttempt = false
 
     var body: some View {
         ZStack {
@@ -22,16 +23,26 @@ struct ObjectPhotoView: View {
                 Image(uiImage: image)
                     .resizable()
                     .scaledToFill()
-            } else {
+            } else if !didAttempt {
                 ProgressView().tint(.secondary)
+            } else {
+                // Load finished with no usable image — a quiet fallback beats
+                // a spinner that never stops.
+                Image(systemName: "sparkles")
+                    .font(.largeTitle)
+                    .foregroundStyle(.secondary)
             }
         }
         .task(id: object.id) {
             if image != nil { return }
-            guard let resource = ObjectImagery.resource(for: object) else { return }
+            didAttempt = false
+            guard let resource = ObjectImagery.resource(for: object) else { didAttempt = true; return }
             let loaded = await ObjectImagery.imageAsync(key: resource.key, subdir: resource.subdir,
                                                         maxPixel: maxPixel)
-            withAnimation(.easeIn(duration: 0.25)) { image = loaded }
+            withAnimation(.easeIn(duration: 0.25)) {
+                image = loaded
+                didAttempt = true
+            }
         }
     }
 }

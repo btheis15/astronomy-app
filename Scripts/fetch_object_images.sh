@@ -20,25 +20,30 @@ fetch() {
   local id="$1" title="$2"
   local dest="$OUT/$id.jpg"
   [ -s "$dest" ] && { echo "skip $id (exists)"; ok=$((ok+1)); return; }
+  # The REST summary endpoint returns the pre-existing full image file
+  # (reliably served, unlike the on-demand thumbnail API which gets
+  # rate-limited to HTML error pages). We downsample locally with sips.
   local url
-  # redirects=1 resolves e.g. Messier_42 -> "Orion Nebula" so the famous
-  # showpiece objects (which live under named articles) return their photo.
-  url=$(curl -sL --max-time 25 -A "$UA" \
-    "https://en.wikipedia.org/w/api.php?action=query&format=json&redirects=1&prop=pageimages&piprop=thumbnail&pithumbsize=$SIZE&titles=$title" \
+  url=$(curl -sL --max-time 25 -A "$UA" "https://en.wikipedia.org/api/rest_v1/page/summary/$title" \
     | python3 -c "import sys,json
 try:
     d=json.load(sys.stdin)
-    pages=d['query']['pages']
-    src=next(iter(pages.values())).get('thumbnail',{}).get('source','')
-    print(src)
+    print(d.get('originalimage',{}).get('source') or d.get('thumbnail',{}).get('source') or '')
 except Exception:
     print('')" 2>/dev/null)
   if [ -z "$url" ]; then echo "MISS $id ($title): no image"; miss=$((miss+1)); return; fi
-  if curl -sL --max-time 40 -A "$UA" -o "$dest" "$url" && [ -s "$dest" ]; then
-    echo "ok   $id  <- $title"; ok=$((ok+1))
+  local tmp; tmp=$(mktemp)
+  if curl -sL --max-time 90 -A "$UA" -o "$tmp" "$url" && [ "$(wc -c < "$tmp")" -gt 4000 ]; then
+    if sips -s format jpeg -Z "$SIZE" "$tmp" --out "$dest" >/dev/null 2>&1 && [ -s "$dest" ]; then
+      echo "ok   $id  <- $title"; ok=$((ok+1))
+    else
+      echo "FAIL $id ($title): resize error"; rm -f "$dest"; miss=$((miss+1))
+    fi
   else
-    echo "FAIL $id ($title): download error"; rm -f "$dest"; miss=$((miss+1))
+    echo "BAD  $id ($title): bad download"; miss=$((miss+1))
   fi
+  rm -f "$tmp"
+  sleep 0.3
 }
 
 # Messier 1–110 — deterministic Wikipedia titles.
