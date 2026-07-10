@@ -2,29 +2,81 @@
 //  ObjectImagery.swift
 //  AstroSky
 //
-//  Real reference photographs for catalog objects: deep-sky and bright-star
-//  images fetched from Wikipedia/Wikimedia (NASA/ESA & contributors) via
-//  Scripts/fetch_object_images.sh and bundled in ObjectImages/, plus the
-//  bundled 2K planet/Moon/Sun maps. Images are decoded off the main thread,
-//  downsampled to the requested size, and cached — so navigation stays smooth.
+//  Real photographs for catalog objects, as a small gallery per object so we
+//  can show more than one source:
+//   • a "telescope view" — a wide-field survey cutout (Pan-STARRS / DSS2 via
+//     CDS hips2fits) framed to the object's true angular size, i.e. what it
+//     actually looks like through a scope;
+//   • a detail/beauty shot — NASA/ESA Hubble (Messier) or a Wikimedia photo.
+//  Plus the bundled 2K planet/Moon/Sun maps. All decoded off the main thread,
+//  downsampled and cached, so navigation stays smooth.
 //
 
 import ImageIO
 import UIKit
 
+/// One bundled photo of an object, with its own credit.
+struct ObjectPhoto: Identifiable, Sendable {
+    let key: String
+    let subdir: String
+    let caption: String
+    let credit: String
+    var id: String { key }
+}
+
 enum ObjectImagery {
-    // NSCache is documented thread-safe; the unchecked annotation is sound.
     nonisolated(unsafe) private static let cache = NSCache<NSString, UIImage>()
 
-    /// Whether a bundled photo exists (cheap — no decode). Safe for layout.
+    /// Ordered gallery of bundled photos for an object (empty if none).
+    static func photos(for object: any CelestialObject) -> [ObjectPhoto] {
+        switch object {
+        case let deepSky as DeepSkyObject:
+            var photos: [ObjectPhoto] = []
+            // Beauty/detail shot first.
+            if exists(deepSky.id, "ObjectImages") {
+                let isHubble = hubbleMessierIDs.contains(deepSky.id)
+                photos.append(ObjectPhoto(key: deepSky.id, subdir: "ObjectImages",
+                                          caption: isHubble ? "Hubble" : "Photograph",
+                                          credit: isHubble ? "NASA / ESA Hubble" : "Wikimedia Commons"))
+            }
+            // Wide-field "telescope view".
+            if exists("\(deepSky.id)_wide", "ObjectImages") {
+                photos.append(ObjectPhoto(key: "\(deepSky.id)_wide", subdir: "ObjectImages",
+                                          caption: "Telescope view", credit: "DSS2 / Pan-STARRS (CDS)"))
+            }
+            return photos
+        case let star as Star:
+            return exists("star_\(star.key)", "ObjectImages")
+                ? [ObjectPhoto(key: "star_\(star.key)", subdir: "ObjectImages",
+                               caption: "Photograph", credit: "Wikimedia Commons")]
+                : []
+        case let planet as PlanetObject:
+            let key = planetTextureKey(planet.planet)
+            return [ObjectPhoto(key: key, subdir: "Textures", caption: "Surface map",
+                                credit: "Solar System Scope (CC BY 4.0)")]
+        case is MoonObject:
+            return [ObjectPhoto(key: "2k_moon", subdir: "Textures", caption: "Surface map",
+                                credit: "Solar System Scope (CC BY 4.0)")]
+        case is SunObject:
+            return [ObjectPhoto(key: "2k_sun", subdir: "Textures", caption: "Surface map",
+                                credit: "Solar System Scope (CC BY 4.0)")]
+        default:
+            return []
+        }
+    }
+
     static func hasImage(for object: any CelestialObject) -> Bool {
-        guard let r = resource(for: object) else { return false }
-        return fileURL(key: r.key, subdir: r.subdir) != nil
+        !photos(for: object).isEmpty
+    }
+
+    /// The most telescope-representative photo (the wide-field cutout if we have
+    /// one), for the eyepiece side-by-side and AR sprite.
+    static func telescopePhoto(for object: any CelestialObject) -> ObjectPhoto? {
+        let all = photos(for: object)
+        return all.first { $0.caption == "Telescope view" } ?? all.first
     }
 
     /// Cached, downsampled photo. Decodes off the main thread on first request.
-    /// Takes plain `Sendable` keys so callers can resolve the object on the main
-    /// actor and hand off only value types.
     static func imageAsync(key: String, subdir: String, maxPixel: CGFloat) async -> UIImage? {
         let cacheKey = "\(key)@\(Int(maxPixel))" as NSString
         if let cached = cache.object(forKey: cacheKey) { return cached }
@@ -36,39 +88,18 @@ enum ObjectImagery {
         return image
     }
 
-    /// Small downsampled CGImage for a deep-sky object's AR sprite texture.
-    /// Synchronous but cheap (256px from an ~800px source); the AR loader calls
-    /// it after startup and yields between objects.
+    /// Small downsampled CGImage for a deep-sky object's AR sprite texture,
+    /// preferring the wide-field cutout. Cheap; the AR loader yields between objects.
     static func thumbnailCGImage(deepSkyID id: String, maxPixel: CGFloat) -> CGImage? {
-        guard let url = fileURL(key: id, subdir: "ObjectImages") else { return nil }
+        let key = exists("\(id)_wide", "ObjectImages") ? "\(id)_wide" : id
+        guard let url = fileURL(key: key, subdir: "ObjectImages") else { return nil }
         return downsample(url: url, maxPixel: maxPixel)?.cgImage
     }
 
-    /// Short credit line shown wherever the photos appear.
-    static let attribution = "Messier photos: NASA / ESA Hubble. Other deep-sky & star photos: Wikimedia Commons. Planet maps: Solar System Scope (CC BY 4.0)."
+    static let attribution = "Telescope-view images: DSS2 / Pan-STARRS (CDS). Messier detail: NASA / ESA Hubble. Other photos: Wikimedia Commons. Planet maps: Solar System Scope (CC BY 4.0)."
 
     // MARK: Mapping
 
-    /// Bundled resource (key, subdirectory) for an object, if a photo exists.
-    /// Synchronous and cheap — resolve on the main actor, then load async.
-    static func resource(for object: any CelestialObject) -> (key: String, subdir: String)? {
-        switch object {
-        case let deepSky as DeepSkyObject:
-            return (deepSky.id, "ObjectImages")
-        case let star as Star:
-            return ("star_\(star.key)", "ObjectImages")
-        case let planet as PlanetObject:
-            return (planetTextureKey(planet.planet), "Textures")
-        case is MoonObject:
-            return ("2k_moon", "Textures")
-        case is SunObject:
-            return ("2k_sun", "Textures")
-        default:
-            return nil
-        }
-    }
-
-    /// Bundled 2K texture key per planet (kept in sync with the Sky markers).
     private static func planetTextureKey(_ planet: Planet) -> String {
         switch planet {
         case .mercury: "2k_mercury"
@@ -82,7 +113,21 @@ enum ObjectImagery {
         }
     }
 
+    /// Messier objects whose primary photo comes from NASA's Hubble catalog.
+    private static let hubbleMessierIDs: Set<String> = {
+        let numbers = [1, 2, 3, 4, 5, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17, 19, 20, 22, 24,
+                       27, 28, 30, 31, 32, 33, 35, 42, 43, 44, 45, 46, 48, 49, 51, 53, 54, 55,
+                       56, 57, 58, 59, 60, 61, 62, 63, 64, 65, 66, 67, 68, 69, 70, 71, 72, 74,
+                       75, 76, 77, 78, 79, 80, 81, 82, 83, 84, 85, 86, 87, 88, 89, 90, 91, 92,
+                       94, 95, 96, 98, 99, 100, 101, 102, 104, 105, 106, 107, 108, 109, 110]
+        return Set(numbers.map { String(format: "m%03d", $0) })
+    }()
+
     // MARK: Loading
+
+    private static func exists(_ key: String, _ subdir: String) -> Bool {
+        fileURL(key: key, subdir: subdir) != nil
+    }
 
     private static func fileURL(key: String, subdir: String) -> URL? {
         for ext in ["jpg", "png"] {
@@ -92,7 +137,6 @@ enum ObjectImagery {
         return nil
     }
 
-    /// Decode + downsample with ImageIO so we never hold a full-size bitmap.
     private static func downsample(url: URL, maxPixel: CGFloat) -> UIImage? {
         let sourceOptions = [kCGImageSourceShouldCache: false] as CFDictionary
         guard let source = CGImageSourceCreateWithURL(url as CFURL, sourceOptions) else { return nil }

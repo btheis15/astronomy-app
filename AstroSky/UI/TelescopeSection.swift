@@ -53,14 +53,19 @@ struct TelescopeSection: View {
     private func previewSection(optics: OpticsResult, eyepiece: Eyepiece) -> some View {
         let assessment = TelescopeVisibility.assess(object: object, optics: optics,
                                                     angularSizeRadians: angularSize, bortleClass: appState.bortleClass)
-        let hasPhoto = ObjectImagery.hasImage(for: object)
+        let telePhoto = ObjectImagery.telescopePhoto(for: object)
+        let wideMatch = telePhoto?.caption == "Telescope view"
         Section {
-            if hasPhoto {
+            if let telePhoto {
                 HStack(alignment: .top, spacing: 12) {
-                    tile(caption: "Photograph") {
-                        ObjectPhotoView(object: object, maxPixel: 500)
+                    tile(caption: "Real photo") {
+                        if wideMatch {
+                            TelescopePhotoTile(photo: telePhoto, zoom: photoZoom(optics: optics))
+                        } else {
+                            ObjectPhotoView(key: telePhoto.key, subdir: telePhoto.subdir, maxPixel: 500)
+                        }
                     }
-                    tile(caption: "Your eyepiece") {
+                    tile(caption: "Eyepiece view") {
                         EyepiecePreviewView(object: object, optics: optics,
                                             angularSizeRadians: angularSize, bortleClass: appState.bortleClass,
                                             julianDate: jd)
@@ -86,10 +91,21 @@ struct TelescopeSection: View {
         } header: {
             Text("Through the eyepiece")
         } footer: {
-            if hasPhoto {
-                Text("Left: a real photograph. Right: a simulation of the view in your eyepiece at this magnification.")
+            if telePhoto != nil {
+                Text(wideMatch
+                     ? "Both show the same field of view at \(Int(optics.magnification))×: a real survey photo (left) and a simulation (right)."
+                     : "Left: a real photograph. Right: a simulation of the eyepiece view.")
             }
         }
+    }
+
+    /// How much to crop the wide-field survey photo so it matches the eyepiece's
+    /// true field of view (the cutout is framed to ~2.2× the object's size).
+    private func photoZoom(optics: OpticsResult) -> CGFloat {
+        let objectDegrees = (angularSize.map { $0 * 180 / .pi }) ?? 0.1
+        let cutoutFOV = min(4.0, max(0.12, objectDegrees * 2.2))
+        let eyepieceFOV = max(0.01, optics.trueFOVDegrees)
+        return CGFloat(min(8.0, max(1.0, cutoutFOV / eyepieceFOV)))
     }
 
     /// A square, rounded tile with a small caption underneath.

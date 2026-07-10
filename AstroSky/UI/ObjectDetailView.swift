@@ -65,10 +65,7 @@ struct ObjectDetailView: View {
     @ViewBuilder private var photoHeroSection: some View {
         if ObjectImagery.hasImage(for: object) {
             Section {
-                ObjectPhotoView(object: object, maxPixel: 900)
-                    .frame(height: 210)
-                    .frame(maxWidth: .infinity)
-                    .clipped()
+                ObjectPhotoGallery(object: object, height: 240)
                     .listRowInsets(EdgeInsets())
             } footer: {
                 Text(ObjectImagery.attribution)
