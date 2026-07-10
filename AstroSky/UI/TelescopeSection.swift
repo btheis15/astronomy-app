@@ -49,17 +49,33 @@ struct TelescopeSection: View {
         }
     }
 
+    @ViewBuilder
     private func previewSection(optics: OpticsResult, eyepiece: Eyepiece) -> some View {
         let assessment = TelescopeVisibility.assess(object: object, optics: optics,
                                                     angularSizeRadians: angularSize, bortleClass: appState.bortleClass)
-        return Section("Through the eyepiece") {
-            EyepiecePreviewView(object: object, optics: optics,
-                                angularSizeRadians: angularSize, bortleClass: appState.bortleClass,
-                                julianDate: jd)
-                .frame(height: 260)
-                .frame(maxWidth: .infinity)
-                .listRowInsets(EdgeInsets())
-                .padding(.vertical, 8)
+        let photo = ObjectImagery.image(for: object)
+        Section {
+            if let photo {
+                HStack(alignment: .top, spacing: 12) {
+                    tile(caption: "Photograph") {
+                        Color.clear.overlay { Image(uiImage: photo).resizable().scaledToFill() }
+                    }
+                    tile(caption: "Your eyepiece") {
+                        EyepiecePreviewView(object: object, optics: optics,
+                                            angularSizeRadians: angularSize, bortleClass: appState.bortleClass,
+                                            julianDate: jd)
+                    }
+                }
+                .listRowInsets(EdgeInsets(top: 12, leading: 16, bottom: 6, trailing: 16))
+            } else {
+                EyepiecePreviewView(object: object, optics: optics,
+                                    angularSizeRadians: angularSize, bortleClass: appState.bortleClass,
+                                    julianDate: jd)
+                    .frame(height: 260)
+                    .frame(maxWidth: .infinity)
+                    .listRowInsets(EdgeInsets())
+                    .padding(.vertical, 8)
+            }
             HStack {
                 Label(assessment.verdict.rawValue, systemImage: assessment.verdict.systemImage)
                     .font(.subheadline.weight(.semibold))
@@ -67,6 +83,24 @@ struct TelescopeSection: View {
                 Text(eyepiece.name).font(.caption).foregroundStyle(.secondary)
             }
             Text(assessment.reason).font(.caption).foregroundStyle(.secondary)
+        } header: {
+            Text("Through the eyepiece")
+        } footer: {
+            if photo != nil {
+                Text("Left: a real photograph. Right: a simulation of the view in your eyepiece at this magnification.")
+            }
+        }
+    }
+
+    /// A square, rounded tile with a small caption underneath.
+    private func tile<Content: View>(caption: LocalizedStringKey,
+                                     @ViewBuilder content: () -> Content) -> some View {
+        VStack(spacing: 4) {
+            content()
+                .frame(maxWidth: .infinity)
+                .aspectRatio(1, contentMode: .fit)
+                .clipShape(RoundedRectangle(cornerRadius: 12))
+            Text(caption).font(.caption2).foregroundStyle(.secondary)
         }
     }
 

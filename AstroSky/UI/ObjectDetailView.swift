@@ -18,6 +18,7 @@ struct ObjectDetailView: View {
 
     var body: some View {
         List {
+            photoHeroSection
             headerSection
             positionSection
             riseSetSection
@@ -58,6 +59,22 @@ struct ObjectDetailView: View {
         }
         .sheet(isPresented: $showLogSheet) {
             LogObservationSheet(object: object)
+        }
+    }
+
+    @ViewBuilder private var photoHeroSection: some View {
+        if let photo = ObjectImagery.image(for: object) {
+            Section {
+                Image(uiImage: photo)
+                    .resizable()
+                    .scaledToFill()
+                    .frame(height: 210)
+                    .frame(maxWidth: .infinity)
+                    .clipped()
+                    .listRowInsets(EdgeInsets())
+            } footer: {
+                Text(ObjectImagery.attribution)
+            }
         }
     }
 
