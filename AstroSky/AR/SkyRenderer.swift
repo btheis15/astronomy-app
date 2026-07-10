@@ -74,6 +74,7 @@ final class SkyRenderer: NSObject {
     private var lastMagnitudeLimit: Double
     private var lastGuideNotify = Date.distantPast
     private var lastGuideReadout: GuideReadout?
+    nonisolated(unsafe) private var guideTaskPending = false
 
     // Manual-mode camera state.
     private let manualCamera = PerspectiveCamera()
@@ -168,7 +169,10 @@ final class SkyRenderer: NSObject {
 
         // Per-frame camera tracking for the guidance arrow (throttled).
         sceneSubscription = arView.scene.subscribe(to: SceneEvents.Update.self) { [weak self] _ in
+            guard let self, !self.guideTaskPending else { return }
+            self.guideTaskPending = true
             Task { @MainActor [weak self] in
+                self?.guideTaskPending = false
                 self?.updateGuideIfNeeded()
             }
         }

@@ -19,6 +19,7 @@ final class AppState {
     let satelliteService = SatelliteService()
     let locationService = LocationService()
     let notificationScheduler = PassNotificationScheduler()
+    private var _equipment: EquipmentLibrary?
 
     var observer: Observer { locationService.observer }
 
@@ -39,14 +40,18 @@ final class AppState {
     var equipment: EquipmentLibrary {
         get {
             access(keyPath: \.equipment)
+            if let cached = _equipment { return cached }
             guard let data = UserDefaults.standard.data(forKey: "equipmentLibrary"),
                   let library = try? JSONDecoder().decode(EquipmentLibrary.self, from: data) else {
+                _equipment = .empty
                 return .empty
             }
+            _equipment = library
             return library
         }
         set {
             withMutation(keyPath: \.equipment) {
+                _equipment = newValue
                 if let data = try? JSONEncoder().encode(newValue) {
                     UserDefaults.standard.set(data, forKey: "equipmentLibrary")
                 }

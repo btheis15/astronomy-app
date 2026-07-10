@@ -23,6 +23,9 @@ struct SkyCatalog {
     let deepSky = SkyCatalog.allDeepSky
     let constellations = ConstellationCatalog.constellations
 
+    let allObjects: [any CelestialObject]
+    private let objectIndex: [String: any CelestialObject]
+
     /// Every deep-sky object across all bundled catalogs (Messier + Caldwell +
     /// famous NGC), used for markers, search and the catalog list.
     static let allDeepSky: [DeepSkyObject] =
@@ -42,16 +45,21 @@ struct SkyCatalog {
             self.stars = StarCatalog.stars
             self.usesDeepCatalog = false
         }
-    }
 
-    /// All searchable objects (excluding satellites, which AppState adds).
-    var allObjects: [any CelestialObject] {
+        // Build allObjects from all sources
         var objects: [any CelestialObject] = [sun, moon]
         objects.append(contentsOf: planets.map { $0 as any CelestialObject })
         objects.append(contentsOf: minorBodies.map { $0 as any CelestialObject })
-        objects.append(contentsOf: StarCatalog.stars.map { $0 as any CelestialObject })
+        objects.append(contentsOf: self.stars.map { $0 as any CelestialObject })
         objects.append(contentsOf: deepSky.map { $0 as any CelestialObject })
-        return objects
+        self.allObjects = objects
+
+        // Build objectIndex for fast lookup
+        var index: [String: any CelestialObject] = [:]
+        for object in self.allObjects {
+            index[object.id] = object
+        }
+        self.objectIndex = index
     }
 
     /// Case/diacritic-insensitive search over names, designations and types.
@@ -86,7 +94,7 @@ struct SkyCatalog {
 
     /// Find an object by its stable identifier.
     func object(withID id: String) -> (any CelestialObject)? {
-        allObjects.first { $0.id == id }
+        objectIndex[id]
     }
 
     /// The brightest stars currently above `altitudeDegrees` (stars are stored

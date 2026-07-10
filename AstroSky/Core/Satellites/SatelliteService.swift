@@ -29,6 +29,7 @@ final class SatelliteService {
 
     private(set) var satellites: [Satellite] = []
     private(set) var state: FetchState = .idle
+    private var _starlinkForDisplay: [Satellite] = []
 
     /// Satellites of the bright/featured kind (non-Starlink).
     var featured: [Satellite] { satellites.filter { !$0.isStarlink } }
@@ -38,7 +39,7 @@ final class SatelliteService {
     /// would clutter the sky and burn CPU. The subset is stable (sorted by
     /// catalog number).
     var starlinkForDisplay: [Satellite] {
-        Array(starlink.sorted { $0.tle.catalogNumber < $1.tle.catalogNumber }.prefix(300))
+        _starlinkForDisplay
     }
 
     func satellite(withID id: String) -> Satellite? {
@@ -115,6 +116,7 @@ final class SatelliteService {
             }
         }
         satellites = result
+        _starlinkForDisplay = Array(satellites.filter(\.isStarlink).sorted { $0.tle.catalogNumber < $1.tle.catalogNumber }.prefix(300))
     }
 
     private static func fetchGroup(_ group: String) async throws -> String {
