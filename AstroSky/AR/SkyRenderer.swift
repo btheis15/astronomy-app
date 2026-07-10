@@ -150,6 +150,7 @@ final class SkyRenderer: NSObject {
             let configuration = ARWorldTrackingConfiguration()
             configuration.worldAlignment = .gravityAndHeading
             configuration.planeDetection = []
+            arView.session.delegate = self
             arView.session.run(configuration)
         } else {
             arView.environment.background = .color(.black)
@@ -237,7 +238,9 @@ final class SkyRenderer: NSObject {
             deepSkyMarkers.addChild(sprite)
             // Hide the small ring glyph now that the photo stands in for it.
             deepSkyMarkers.children.first { $0.name == object.id }?.isEnabled = false
-            await Task.yield()
+            // 50 ms pause lets ARKit release the previous frame before the next
+            // GPU texture upload — prevents the "retaining N ARFrames" warning.
+            try? await Task.sleep(for: .milliseconds(50))
         }
     }
 
@@ -734,5 +737,21 @@ final class SkyRenderer: NSObject {
         let yawRotation = simd_quatf(angle: manualYaw, axis: SIMD3(0, 1, 0))
         let pitchRotation = simd_quatf(angle: manualPitch, axis: SIMD3(1, 0, 0))
         manualCamera.orientation = yawRotation * pitchRotation
+    }
+}
+
+// MARK: - ARSessionDelegate
+
+extension SkyRenderer: ARSessionDelegate {
+    /// When ARKit fails to get true north (error 102 — compass unavailable or
+    /// Compass Calibration disabled), auto-switch to VR mode so the sky stays
+    /// usable and correctly oriented via the gyroscope alone.
+    nonisolated func session(_ session: ARSession, didFailWithError error: Error) {
+        let nsError = error as NSError
+        guard nsError.domain == "com.apple.arkit.error", nsError.code == 102 else { return }
+        Task { @MainActor [weak self] in
+            guard let self, self.isARMode else { return }
+            self.appState.skyDisplayMode = .vr
+        }
     }
 }
