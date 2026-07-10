@@ -114,18 +114,18 @@ enum SkySceneBuilder {
             let center = CGPoint(x: dimension / 2, y: dimension / 2)
             let maxRadius = CGFloat(dimension) / 2
             let space = CGColorSpaceCreateDeviceRGB()
-            let glow = CGGradient(colorsSpace: space,
-                                  colors: [UIColor(white: 1, alpha: 1).cgColor,
-                                           UIColor(white: 1, alpha: 0).cgColor] as CFArray,
-                                  locations: [0, 1])!
+            guard let glow = CGGradient(colorsSpace: space,
+                                        colors: [UIColor(white: 1, alpha: 1).cgColor,
+                                                 UIColor(white: 1, alpha: 0).cgColor] as CFArray,
+                                        locations: [0, 1]) else { return }
             cg.drawRadialGradient(glow, startCenter: center, startRadius: 0,
                                   endCenter: center, endRadius: maxRadius * 0.95, options: [])
             if spikes {
                 cg.setBlendMode(.plusLighter)
-                let spike = CGGradient(colorsSpace: space,
-                                       colors: [UIColor(white: 1, alpha: 0.85).cgColor,
-                                                UIColor(white: 1, alpha: 0).cgColor] as CFArray,
-                                       locations: [0, 1])!
+                guard let spike = CGGradient(colorsSpace: space,
+                                             colors: [UIColor(white: 1, alpha: 0.85).cgColor,
+                                                      UIColor(white: 1, alpha: 0).cgColor] as CFArray,
+                                             locations: [0, 1]) else { return }
                 for angle in [0.0, Double.pi / 2] {
                     cg.saveGState()
                     cg.translateBy(x: center.x, y: center.y)
@@ -301,13 +301,13 @@ enum SkySceneBuilder {
         let image = renderer.image { context in
             let space = CGColorSpaceCreateDeviceRGB()
             let tint = UIColor(red: 0.72, green: 0.78, blue: 0.95, alpha: 1)
-            let gradient = CGGradient(colorsSpace: space,
-                                      colors: [tint.withAlphaComponent(0.0).cgColor,
-                                               tint.withAlphaComponent(0.10).cgColor,
-                                               tint.withAlphaComponent(0.28).cgColor,
-                                               tint.withAlphaComponent(0.10).cgColor,
-                                               tint.withAlphaComponent(0.0).cgColor] as CFArray,
-                                      locations: [0, 0.32, 0.5, 0.68, 1])!
+            guard let gradient = CGGradient(colorsSpace: space,
+                                            colors: [tint.withAlphaComponent(0.0).cgColor,
+                                                     tint.withAlphaComponent(0.10).cgColor,
+                                                     tint.withAlphaComponent(0.28).cgColor,
+                                                     tint.withAlphaComponent(0.10).cgColor,
+                                                     tint.withAlphaComponent(0.0).cgColor] as CFArray,
+                                            locations: [0, 0.32, 0.5, 0.68, 1]) else { return }
             context.cgContext.drawLinearGradient(gradient,
                                                  start: CGPoint(x: 0, y: 0),
                                                  end: CGPoint(x: 0, y: height),
@@ -651,11 +651,11 @@ enum SkySceneBuilder {
         let image = renderer.image { context in
             let space = CGColorSpaceCreateDeviceRGB()
             let tint = UIColor(red: 0.55, green: 0.45, blue: 0.34, alpha: 1)   // sodium-glow warm
-            let gradient = CGGradient(colorsSpace: space,
-                                      colors: [tint.withAlphaComponent(0.0).cgColor,
-                                               tint.withAlphaComponent(0.12).cgColor,
-                                               tint.withAlphaComponent(0.6).cgColor] as CFArray,
-                                      locations: [0, 0.55, 1])!
+            guard let gradient = CGGradient(colorsSpace: space,
+                                            colors: [tint.withAlphaComponent(0.0).cgColor,
+                                                     tint.withAlphaComponent(0.12).cgColor,
+                                                     tint.withAlphaComponent(0.6).cgColor] as CFArray,
+                                            locations: [0, 0.55, 1]) else { return }
             // v=0 (top, faint) → v=1 (bottom, near horizon, strong).
             context.cgContext.drawLinearGradient(gradient,
                                                  start: CGPoint(x: 0, y: 0),

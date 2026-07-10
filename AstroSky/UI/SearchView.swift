@@ -9,9 +9,10 @@ struct SearchView: View {
     @Environment(AppState.self) private var appState
     @Environment(\.dismiss) private var dismiss
     @State private var query = ""
+    @State private var debouncedQuery = ""
 
     private var results: [any CelestialObject] {
-        appState.search(query)
+        appState.search(debouncedQuery)
     }
 
     var body: some View {
@@ -43,6 +44,12 @@ struct SearchView: View {
                 ToolbarItem(placement: .cancellationAction) {
                     Button("Done") { dismiss() }
                 }
+            }
+            .task(id: query) {
+                do {
+                    try await Task.sleep(for: .milliseconds(150))
+                    debouncedQuery = query
+                } catch { }
             }
         }
     }
