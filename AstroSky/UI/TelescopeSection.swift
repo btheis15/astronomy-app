@@ -53,12 +53,12 @@ struct TelescopeSection: View {
     private func previewSection(optics: OpticsResult, eyepiece: Eyepiece) -> some View {
         let assessment = TelescopeVisibility.assess(object: object, optics: optics,
                                                     angularSizeRadians: angularSize, bortleClass: appState.bortleClass)
-        let photo = ObjectImagery.image(for: object)
+        let hasPhoto = ObjectImagery.hasImage(for: object)
         Section {
-            if let photo {
+            if hasPhoto {
                 HStack(alignment: .top, spacing: 12) {
                     tile(caption: "Photograph") {
-                        Color.clear.overlay { Image(uiImage: photo).resizable().scaledToFill() }
+                        ObjectPhotoView(object: object, maxPixel: 500)
                     }
                     tile(caption: "Your eyepiece") {
                         EyepiecePreviewView(object: object, optics: optics,
@@ -86,7 +86,7 @@ struct TelescopeSection: View {
         } header: {
             Text("Through the eyepiece")
         } footer: {
-            if photo != nil {
+            if hasPhoto {
                 Text("Left: a real photograph. Right: a simulation of the view in your eyepiece at this magnification.")
             }
         }

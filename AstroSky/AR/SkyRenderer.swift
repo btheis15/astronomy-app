@@ -62,12 +62,15 @@ final class SkyRenderer: NSObject {
     private var satelliteTrack = Entity()
     private var meteorRadiants = Entity()
     private var lastActiveShowers: Set<String> = []
+    private var lastShowerDay = Int.min
     private let horizonGlow: Entity
 
     // Update bookkeeping.
     private var updateTimer: Timer?
     private var sceneSubscription: Cancellable?
     private var lastSolarUpdateJD: Double = 0
+    private var lastTrackID: String?
+    private var lastTrackJD: Double = 0
     private var lastMagnitudeLimit: Double
     private var lastGuideNotify = Date.distantPast
     private var lastGuideReadout: GuideReadout?
@@ -256,12 +259,17 @@ final class SkyRenderer: NSObject {
         satelliteRoot.isEnabled = appState.showSatellites
         updateLabelDensity()
 
-        // Meteor-shower radiants: rebuild when the active set changes.
+        // Meteor-shower radiants change at most daily — only recompute the
+        // active set when the (sky) day rolls over, not every tick.
         if appState.showMeteorShowers {
-            let active = Set(MeteorShowers.active(on: appState.skyDate).map(\.name))
-            if active != lastActiveShowers {
-                lastActiveShowers = active
-                rebuildMeteorRadiants()
+            let day = Int(appState.skyDate.timeIntervalSince1970 / 86_400)
+            if day != lastShowerDay {
+                lastShowerDay = day
+                let active = Set(MeteorShowers.active(on: appState.skyDate).map(\.name))
+                if active != lastActiveShowers {
+                    lastActiveShowers = active
+                    rebuildMeteorRadiants()
+                }
             }
         }
         meteorRadiants.isEnabled = appState.showMeteorShowers
@@ -404,12 +412,28 @@ final class SkyRenderer: NSObject {
     /// sampled every 15 s (world frame). Rebuilt each tick so it follows both
     /// the satellite's motion and any time-travel change.
     private func updateSatelliteTrack(julianDate jd: Double, observer: Observer) {
+        let satellite = appState.showSatellites ? appState.selectedObject as? Satellite : nil
+
+        // Nothing selected: clear an existing track once, then stay idle.
+        guard let satellite else {
+            if lastTrackID != nil {
+                satelliteTrack.removeFromParent()
+                satelliteTrack = Entity()
+                worldAnchor.addChild(satelliteTrack)
+                lastTrackID = nil
+            }
+            return
+        }
+
+        // The ground track is 81 SGP4 samples + a polyline mesh — only rebuild
+        // when the selection changes or time has moved enough to matter.
+        if satellite.id == lastTrackID && abs(jd - lastTrackJD) * 86_400 < 5 { return }
+        lastTrackID = satellite.id
+        lastTrackJD = jd
+
         satelliteTrack.removeFromParent()
         satelliteTrack = Entity()
         worldAnchor.addChild(satelliteTrack)
-
-        guard appState.showSatellites,
-              let satellite = appState.selectedObject as? Satellite else { return }
 
         let radius = SkySceneBuilder.sphereRadius * 0.9
         let points: [SIMD3<Float>?] = stride(from: -600.0, through: 600.0, by: 15.0).map { offset in

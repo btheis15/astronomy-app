@@ -63,11 +63,9 @@ struct ObjectDetailView: View {
     }
 
     @ViewBuilder private var photoHeroSection: some View {
-        if let photo = ObjectImagery.image(for: object) {
+        if ObjectImagery.hasImage(for: object) {
             Section {
-                Image(uiImage: photo)
-                    .resizable()
-                    .scaledToFill()
+                ObjectPhotoView(object: object, maxPixel: 900)
                     .frame(height: 210)
                     .frame(maxWidth: .infinity)
                     .clipped()
@@ -180,17 +178,24 @@ struct AltitudeChartSection: View {
         var id: Date { date }
     }
 
-    private var samples: [Sample] {
-        // Noon today → noon tomorrow, 15-minute steps.
+    /// Cached curve — recomputed only when the object or the day changes, not
+    /// on every body evaluation (each sample is a full ephemeris solve).
+    @State private var samples: [Sample] = []
+
+    private var reloadKey: String {
+        let day = Int(Calendar.current.startOfDay(for: appState.skyDate).timeIntervalSince1970)
+        return "\(object.id)|\(day)|\(Int(appState.observer.latitude * 100))|\(Int(appState.observer.longitude * 100))"
+    }
+
+    private static func computeSamples(object: any CelestialObject, date: Date, observer: Observer) -> [Sample] {
         let calendar = Calendar.current
-        let dayStart = calendar.startOfDay(for: appState.skyDate)
+        let dayStart = calendar.startOfDay(for: date)
         guard let noon = calendar.date(byAdding: .hour, value: 12, to: dayStart) else { return [] }
-        let observer = appState.observer
         return stride(from: 0.0, through: 24.0, by: 0.25).map { hours in
-            let date = noon.addingTimeInterval(hours * 3600)
-            let jd = AstroTime.julianDate(date)
+            let sampleDate = noon.addingTimeInterval(hours * 3600)
+            let jd = AstroTime.julianDate(sampleDate)
             let altitude = object.horizontal(julianDate: jd, observer: observer).altitudeDegrees
-            return Sample(date: date, altitudeDegrees: altitude)
+            return Sample(date: sampleDate, altitudeDegrees: altitude)
         }
     }
 
@@ -237,6 +242,9 @@ struct AltitudeChartSection: View {
                     }
                     .font(.subheadline)
                 }
+            }
+            .task(id: reloadKey) {
+                samples = Self.computeSamples(object: object, date: appState.skyDate, observer: appState.observer)
             }
         }
     }

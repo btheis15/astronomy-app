@@ -14,7 +14,7 @@ struct ObserveTonightView: View {
     @State private var targets: [Target] = []
     @State private var loaded = false
 
-    struct Target: Identifiable {
+    struct Target: Identifiable, Sendable {
         let object: any CelestialObject
         let verdict: VisibilityAssessment.Verdict
         let maxAltitude: Double
@@ -89,29 +89,35 @@ struct ObserveTonightView: View {
         candidates = candidates.filter { seenNames.insert($0.name.lowercased()).inserted }
 
         let jd = appState.skyJulianDate
-        var result: [Target] = []
-        for object in candidates {
-            let placement = TonightPlacementCalculator.compute(object: object, observer: observer, date: now)
-            guard placement.isWellPlaced else { continue }
-            let verdict: VisibilityAssessment.Verdict
-            if let optics {
-                let size = AngularSizeSource.angularSizeRadians(for: object, julianDate: jd)
-                verdict = TelescopeVisibility.assess(object: object, optics: optics,
-                                                     angularSizeRadians: size, bortleClass: bortle).verdict
-            } else {
-                verdict = .visible
+
+        // The candidate loop samples tens of thousands of ephemeris positions —
+        // run it off the main actor so opening the screen never freezes.
+        let computed = await Task.detached(priority: .userInitiated) { () -> [Target] in
+            var result: [Target] = []
+            for object in candidates {
+                let placement = TonightPlacementCalculator.compute(object: object, observer: observer, date: now)
+                guard placement.isWellPlaced else { continue }
+                let verdict: VisibilityAssessment.Verdict
+                if let optics {
+                    let size = AngularSizeSource.angularSizeRadians(for: object, julianDate: jd)
+                    verdict = TelescopeVisibility.assess(object: object, optics: optics,
+                                                         angularSizeRadians: size, bortleClass: bortle).verdict
+                } else {
+                    verdict = .visible
+                }
+                guard verdict != .notVisible else { continue }
+                result.append(Target(object: object, verdict: verdict,
+                                      maxAltitude: placement.maxAltitudeDegrees, bestTime: placement.bestTime))
             }
-            guard verdict != .notVisible else { continue }
-            result.append(Target(object: object, verdict: verdict,
-                                  maxAltitude: placement.maxAltitudeDegrees, bestTime: placement.bestTime))
-        }
-        // Easiest first, then highest.
-        let order: [VisibilityAssessment.Verdict] = [.easy, .visible, .challenging, .notVisible]
-        targets = result.sorted {
-            let a = order.firstIndex(of: $0.verdict) ?? 9
-            let b = order.firstIndex(of: $1.verdict) ?? 9
-            return a != b ? a < b : $0.maxAltitude > $1.maxAltitude
-        }
+            let order: [VisibilityAssessment.Verdict] = [.easy, .visible, .challenging, .notVisible]
+            return result.sorted {
+                let a = order.firstIndex(of: $0.verdict) ?? 9
+                let b = order.firstIndex(of: $1.verdict) ?? 9
+                return a != b ? a < b : $0.maxAltitude > $1.maxAltitude
+            }
+        }.value
+
+        targets = computed
         loaded = true
     }
 }
