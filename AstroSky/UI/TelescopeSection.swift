@@ -60,7 +60,7 @@ struct TelescopeSection: View {
                 HStack(alignment: .top, spacing: 12) {
                     tile(caption: "Real photo") {
                         if wideMatch {
-                            TelescopePhotoTile(photo: telePhoto, zoom: photoZoom(optics: optics))
+                            TelescopePhotoTile(photo: telePhoto, zoom: photoZoom())
                         } else {
                             ObjectPhotoView(key: telePhoto.key, subdir: telePhoto.subdir, maxPixel: 500)
                         }
@@ -92,9 +92,7 @@ struct TelescopeSection: View {
             Text("Through the eyepiece")
         } footer: {
             if telePhoto != nil {
-                Text(wideMatch
-                     ? "Both show the same field of view at \(Int(optics.magnification))×: a real survey photo (left) and a simulation (right)."
-                     : "Left: a real photograph. Right: a simulation of the eyepiece view.")
+                Text("Left: a real survey photo. Right: simulated eyepiece view at \(Int(optics.magnification))×.")
             }
         }
     }
@@ -127,13 +125,16 @@ struct TelescopeSection: View {
         }
     }
 
-    /// How much to crop the wide-field survey photo so it matches the eyepiece's
-    /// true field of view (the cutout is framed to ~2.2× the object's size).
-    private func photoZoom(optics: OpticsResult) -> CGFloat {
+    /// Fixed zoom for the real-photo tile so it shows the object at a consistent
+    /// scale regardless of which eyepiece is selected. The survey cutout is
+    /// already framed to ~2.2× the object's angular size, so zoom=1 shows it
+    /// at that natural framing; we stay at 1.0 unless the object is tiny.
+    private func photoZoom() -> CGFloat {
         let objectDegrees = (angularSize.map { $0 * 180 / .pi }) ?? 0.1
         let cutoutFOV = min(4.0, max(0.12, objectDegrees * 2.2))
-        let eyepieceFOV = max(0.01, optics.trueFOVDegrees)
-        return CGFloat(min(8.0, max(1.0, cutoutFOV / eyepieceFOV)))
+        // Use a fixed 1° reference instead of the eyepiece FOV so the photo
+        // doesn't change when the user switches lenses.
+        return CGFloat(min(4.0, max(1.0, cutoutFOV / 1.0)))
     }
 
     /// A square, rounded tile with a small caption underneath.

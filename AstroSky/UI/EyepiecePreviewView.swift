@@ -126,7 +126,10 @@ struct EyepiecePreviewView: View {
         }
     }
 
-    private var objectPixels: CGFloat { CGFloat(min(1.0, fillFraction)) }
+    // No cap at 1.0 — when the object exceeds the FOV, let it extend beyond
+    // the field radius so the canvas clip shows it overflowing the aperture.
+    // This makes the simulation visibly respond when switching eyepieces.
+    private var objectPixels: CGFloat { CGFloat(fillFraction) }
 
     // MARK: Sun
 
