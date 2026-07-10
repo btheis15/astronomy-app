@@ -64,7 +64,7 @@ struct ObserveTonightView: View {
             VStack(alignment: .trailing, spacing: 2) {
                 Text(target.verdict.rawValue).font(.caption.weight(.semibold))
                 if let best = target.bestTime {
-                    Text(best.formatted(date: .omitted, time: .shortened))
+                    Text(AstroFormat.time(best))
                         .font(.caption2).foregroundStyle(.secondary)
                 }
             }

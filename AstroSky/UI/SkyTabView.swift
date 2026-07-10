@@ -287,10 +287,13 @@ struct ObjectCardView: View {
     @Environment(AppState.self) private var appState
     let object: any CelestialObject
     @State private var showDetail = false
+    @State private var altStr = "—"
+    @State private var azStr = "—"
+
+    /// Changes every 5 real seconds — limits how often we rerun ephemeris.
+    private var positionKey: Int { Int(appState.skyJulianDate * 17280) }
 
     var body: some View {
-        let position = object.skyPosition(julianDate: appState.skyJulianDate,
-                                          observer: appState.observer)
         HStack(spacing: 12) {
             ObjectGlyph(object: object, size: 38)
                 .frame(width: 42)
@@ -299,8 +302,8 @@ struct ObjectCardView: View {
                 Text(object.name).font(.headline)
                 Text(object.subtitle).font(.caption).foregroundStyle(.secondary)
                 HStack(spacing: 10) {
-                    Label(AstroFormat.degrees(position.horizontal.altitude), systemImage: "arrow.up.and.down")
-                    Label(AstroFormat.azimuth(position.horizontal), systemImage: "safari")
+                    Label(altStr, systemImage: "arrow.up.and.down")
+                    Label(azStr, systemImage: "safari")
                     if let magnitude = object.magnitude {
                         Label(AstroFormat.magnitude(magnitude), systemImage: "sun.max")
                     }
@@ -331,6 +334,12 @@ struct ObjectCardView: View {
             NavigationStack {
                 ObjectDetailView(object: object)
             }
+        }
+        .task(id: positionKey) {
+            let pos = object.skyPosition(julianDate: appState.skyJulianDate,
+                                         observer: appState.observer)
+            altStr = AstroFormat.degrees(pos.horizontal.altitude)
+            azStr = AstroFormat.azimuth(pos.horizontal)
         }
     }
 }
