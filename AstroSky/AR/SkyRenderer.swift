@@ -14,6 +14,7 @@
 
 import ARKit
 import Combine
+import CoreMotion
 import Foundation
 import RealityKit
 import UIKit
@@ -35,7 +36,9 @@ struct GuideReadout: Equatable {
 final class SkyRenderer: NSObject {
     let arView: ARView
     let isARMode: Bool
+    let isVRMode: Bool
     private unowned let appState: AppState
+    private var motionManager: CMMotionManager?
 
     var onGuideUpdate: ((GuideReadout?) -> Void)?
 
@@ -84,12 +87,16 @@ final class SkyRenderer: NSObject {
 
     // MARK: Setup
 
-    init(appState: AppState, preferManualMode: Bool) {
+    init(appState: AppState, skyDisplayMode: SkyDisplayMode) {
         self.appState = appState
         self.lastMagnitudeLimit = appState.effectiveMagnitudeLimit
 
         let arSupported = ARWorldTrackingConfiguration.isSupported
-        self.isARMode = arSupported && !preferManualMode
+        self.isARMode = arSupported && skyDisplayMode == .ar
+        // VR mode: motion-tracked black background. Falls back to free-look if
+        // the device has no motion hardware (e.g. simulator).
+        let motionAvailable = CMMotionManager().isDeviceMotionAvailable
+        self.isVRMode = !self.isARMode && skyDisplayMode == .vr && motionAvailable
 
         arView = ARView(frame: .zero,
                         cameraMode: isARMode ? .ar : .nonAR,
@@ -150,21 +157,30 @@ final class SkyRenderer: NSObject {
             let cameraAnchor = AnchorEntity(world: matrix_identity_float4x4)
             cameraAnchor.addChild(manualCamera)
             arView.scene.addAnchor(cameraAnchor)
-            applyManualCameraOrientation()
-            installManualGestures()
+            if isVRMode {
+                startMotionTracking()
+            } else {
+                applyManualCameraOrientation()
+                installManualGestures()
+            }
         }
 
         let tap = UITapGestureRecognizer(target: self, action: #selector(handleTap(_:)))
         arView.addGestureRecognizer(tap)
 
-        // AR fine-alignment: a two-finger horizontal drag rotates the overlay
-        // about the zenith to correct heading error. (Manual mode uses one- and
-        // two-finger drags for looking around, so this is AR-only.)
-        if isARMode {
+        // Two-finger pan: rotates the sky overlay about the zenith for heading
+        // correction. Available in AR and VR modes (not free-look, which uses
+        // drag for camera control).
+        if isARMode || isVRMode {
             let alignPan = UIPanGestureRecognizer(target: self, action: #selector(handleAlignPan(_:)))
             alignPan.minimumNumberOfTouches = 2
             alignPan.maximumNumberOfTouches = 2
             arView.addGestureRecognizer(alignPan)
+        }
+        // Pinch-to-zoom in VR mode (free-look already installs it via installManualGestures).
+        if isVRMode {
+            let pinch = UIPinchGestureRecognizer(target: self, action: #selector(handlePinch(_:)))
+            arView.addGestureRecognizer(pinch)
         }
 
         // Per-frame camera tracking for the guidance arrow (throttled).
@@ -266,6 +282,9 @@ final class SkyRenderer: NSObject {
         sceneSubscription?.cancel()
         if isARMode {
             arView.session.pause()
+        } else if isVRMode {
+            motionManager?.stopDeviceMotionUpdates()
+            motionManager = nil
         }
     }
 
@@ -625,6 +644,56 @@ final class SkyRenderer: NSObject {
         }
 
         return best?.object
+    }
+
+    // MARK: VR-mode motion tracking
+
+    private func startMotionTracking() {
+        let mm = CMMotionManager()
+        guard mm.isDeviceMotionAvailable else { return }
+        motionManager = mm
+        mm.deviceMotionUpdateInterval = 1.0 / 60.0
+        mm.startDeviceMotionUpdates(using: .xMagneticNorthZVertical, to: .main) { [weak self] motion, _ in
+            guard let self, let motion else { return }
+            let rm = motion.attitude.rotationMatrix
+            Task { @MainActor [weak self] in
+                self?.applyMotionOrientation(rm)
+            }
+        }
+    }
+
+    /// Converts a CMRotationMatrix (body→NWU reference) into the camera
+    /// orientation for the RealityKit scene (x=East, y=Up, z=South).
+    ///
+    /// CMMotion reference (xMagneticNorthZVertical): x=North, y=West, z=Up.
+    /// RealityKit world (gravity+heading):           x=East,  y=Up,   z=South.
+    ///
+    /// The camera faces through the screen (+z body = screen normal), so that
+    /// holding the phone face-up shows the zenith, and tilting it northward
+    /// shows the northern sky — matching AR mode's viewer model.
+    private func applyMotionOrientation(_ rm: CMRotationMatrix) {
+        // Columns of rm are body-frame axes expressed in the NWU reference.
+        let bodyRight  = SIMD3<Float>(Float(rm.m11), Float(rm.m21), Float(rm.m31))
+        let bodyTop    = SIMD3<Float>(Float(rm.m12), Float(rm.m22), Float(rm.m32))
+        let bodyScreen = SIMD3<Float>(Float(rm.m13), Float(rm.m23), Float(rm.m33))
+
+        // NWU → RealityKit EUS: x_rl = -y_nwu, y_rl = z_nwu, z_rl = -x_nwu
+        func nwuToRL(_ v: SIMD3<Float>) -> SIMD3<Float> {
+            SIMD3<Float>(-v.y, v.z, -v.x)
+        }
+
+        let camRight   = nwuToRL(bodyRight)    // camera local +x  (phone right edge in world)
+        let camUp      = nwuToRL(bodyTop)      // camera local +y  (phone top edge in world)
+        let camForward = nwuToRL(bodyScreen)   // screen normal in world = view direction
+
+        // Camera looks along its local −z axis; columns of rotation matrix are
+        // [right, up, back] = [camRight, camUp, −camForward].
+        let rotMatrix = float3x3(columns: (
+            camRight,
+            camUp,
+            SIMD3<Float>(-camForward.x, -camForward.y, -camForward.z)
+        ))
+        manualCamera.orientation = simd_quatf(rotMatrix)
     }
 
     // MARK: Manual-mode camera

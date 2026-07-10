@@ -10,6 +10,12 @@ import Foundation
 import Observation
 import SwiftUI
 
+enum SkyDisplayMode: Int, Hashable {
+    case ar = 0       // camera passthrough + ARKit motion tracking
+    case vr = 1       // black background + gyroscope motion tracking
+    case freeLook = 2 // black background + drag to look
+}
+
 @MainActor
 @Observable
 final class AppState {
@@ -49,8 +55,8 @@ final class AppState {
         didSet { UserDefaults.standard.set(nightMode, forKey: "nightMode") }
     }
 
-    var preferManualSky: Bool = false {
-        didSet { UserDefaults.standard.set(preferManualSky, forKey: "preferManualSky") }
+    var skyDisplayMode: SkyDisplayMode = .ar {
+        didSet { UserDefaults.standard.set(skyDisplayMode.rawValue, forKey: "skyDisplayMode") }
     }
 
     var showMeteorShowers: Bool = true {
@@ -79,7 +85,8 @@ final class AppState {
 
     var bortleClass: Int = 4 {
         didSet {
-            bortleClass = min(9, max(1, bortleClass))
+            let clamped = min(9, max(1, bortleClass))
+            if clamped != bortleClass { bortleClass = clamped }
             UserDefaults.standard.set(bortleClass, forKey: "bortleClass")
         }
     }
@@ -102,7 +109,12 @@ final class AppState {
         showStarlink = ud.object(forKey: "showStarlink") == nil ? false : ud.bool(forKey: "showStarlink")
         showDeepSky = ud.object(forKey: "showDeepSky") == nil ? true : ud.bool(forKey: "showDeepSky")
         nightMode = ud.object(forKey: "nightMode") == nil ? false : ud.bool(forKey: "nightMode")
-        preferManualSky = ud.object(forKey: "preferManualSky") == nil ? false : ud.bool(forKey: "preferManualSky")
+        // Migrate from old preferManualSky bool if skyDisplayMode not yet stored.
+        if ud.object(forKey: "skyDisplayMode") != nil {
+            skyDisplayMode = SkyDisplayMode(rawValue: ud.integer(forKey: "skyDisplayMode")) ?? .ar
+        } else {
+            skyDisplayMode = ud.bool(forKey: "preferManualSky") ? .freeLook : .ar
+        }
         showMeteorShowers = ud.object(forKey: "showMeteorShowers") == nil ? true : ud.bool(forKey: "showMeteorShowers")
         showMilkyWay = ud.object(forKey: "showMilkyWay") == nil ? true : ud.bool(forKey: "showMilkyWay")
         showEcliptic = ud.object(forKey: "showEcliptic") == nil ? false : ud.bool(forKey: "showEcliptic")

@@ -14,10 +14,22 @@ struct SkyTabView: View {
     @State private var guide: GuideReadout?
     @State private var showSearch = false
 
-    /// Effective free-look mode: the user's persisted choice, forced on where
-    /// AR isn't available (e.g. Simulator).
-    private var manualMode: Bool {
-        appState.preferManualSky || !ARWorldTrackingConfiguration.isSupported
+    /// Effective display mode: honours the stored preference but falls back to
+    /// VR (motion-tracked) when AR isn't available (e.g. Simulator).
+    private var effectiveMode: SkyDisplayMode {
+        if !ARWorldTrackingConfiguration.isSupported && appState.skyDisplayMode == .ar {
+            return .vr
+        }
+        return appState.skyDisplayMode
+    }
+
+    private func cycleSkyMode() {
+        let arSupported = ARWorldTrackingConfiguration.isSupported
+        switch appState.skyDisplayMode {
+        case .ar:       appState.skyDisplayMode = .vr
+        case .vr:       appState.skyDisplayMode = .freeLook
+        case .freeLook: appState.skyDisplayMode = arSupported ? .ar : .vr
+        }
     }
     @State private var showTimeControls = false
     @State private var renderer: SkyRenderer?
@@ -27,10 +39,10 @@ struct SkyTabView: View {
     var body: some View {
         ZStack {
             SkyARViewContainer(appState: appState,
-                               preferManualMode: manualMode,
+                               skyDisplayMode: effectiveMode,
                                onGuideUpdate: { guide = $0 },
                                onRendererReady: { renderer = $0 })
-            .id(manualMode)   // rebuild the view when switching modes
+            .id(effectiveMode)   // rebuild the view when switching modes
             .ignoresSafeArea()
 
             hud
@@ -121,11 +133,10 @@ struct SkyTabView: View {
             hudButton(systemImage: "clock", label: "Time travel controls") {
                 showTimeControls.toggle()
             }
-            if ARWorldTrackingConfiguration.isSupported {
-                hudButton(systemImage: manualMode ? "arkit" : "move.3d",
-                          label: manualMode ? "Switch to camera (AR) mode" : "Switch to free-look mode") {
-                    appState.preferManualSky.toggle()
-                }
+            // Mode toggle: cycles AR → VR (immersive) → Free-look → AR.
+            // Icon shows what you'll switch TO.
+            hudButton(systemImage: nextModeIcon, label: nextModeLabel) {
+                cycleSkyMode()
             }
             hudButton(systemImage: isCapturing ? "camera.fill" : "camera", label: "Take photo") {
                 capturePhoto()
@@ -136,6 +147,23 @@ struct SkyTabView: View {
         }
         .padding(.horizontal)
         .padding(.top, 4)
+    }
+
+    /// SF Symbol for the mode button — shows what you'll switch TO.
+    private var nextModeIcon: String {
+        switch effectiveMode {
+        case .ar:       return "moon.stars.fill"   // tap → VR immersive
+        case .vr:       return "move.3d"           // tap → free-look
+        case .freeLook: return ARWorldTrackingConfiguration.isSupported ? "camera.viewfinder" : "moon.stars.fill"
+        }
+    }
+
+    private var nextModeLabel: String {
+        switch effectiveMode {
+        case .ar:       return "Switch to immersive sky (no camera)"
+        case .vr:       return "Switch to free-look mode"
+        case .freeLook: return ARWorldTrackingConfiguration.isSupported ? "Switch to AR camera mode" : "Switch to immersive sky"
+        }
     }
 
     private var locationBadge: some View {

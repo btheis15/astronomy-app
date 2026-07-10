@@ -64,11 +64,16 @@ struct SettingsView: View {
                 }
 
                 Section {
-                    Toggle("Free-look mode", isOn: $appState.preferManualSky)
+                    Picker("Sky view mode", selection: $appState.skyDisplayMode) {
+                        Text("AR camera").tag(SkyDisplayMode.ar)
+                        Text("Immersive (no camera)").tag(SkyDisplayMode.vr)
+                        Text("Free-look (drag)").tag(SkyDisplayMode.freeLook)
+                    }
+                    .pickerStyle(.menu)
                 } header: {
                     Text("Sky view")
                 } footer: {
-                    Text("Turns off the camera for a dark, drag-to-explore sky — easier to find objects indoors or under bright lights. You can also toggle this from the sky's mode button.")
+                    Text("AR uses the camera for a real-world overlay. Immersive shows a pure black sky driven by the gyroscope. Free-look lets you drag to look around.")
                 }
 
                 Section {
