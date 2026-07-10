@@ -36,12 +36,12 @@ enum ObjectImagery {
         return image
     }
 
-    /// Downsampled CGImage for a deep-sky object's AR sprite texture (off-main).
-    static func thumbnailCGImage(deepSkyID id: String, maxPixel: CGFloat) async -> CGImage? {
+    /// Small downsampled CGImage for a deep-sky object's AR sprite texture.
+    /// Synchronous but cheap (256px from an ~800px source); the AR loader calls
+    /// it after startup and yields between objects.
+    static func thumbnailCGImage(deepSkyID id: String, maxPixel: CGFloat) -> CGImage? {
         guard let url = fileURL(key: id, subdir: "ObjectImages") else { return nil }
-        return await Task.detached(priority: .utility) {
-            downsample(url: url, maxPixel: maxPixel)?.cgImage
-        }.value
+        return downsample(url: url, maxPixel: maxPixel)?.cgImage
     }
 
     /// Short credit line shown wherever the photos appear.

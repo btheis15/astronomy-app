@@ -152,9 +152,11 @@ enum SkySceneBuilder {
     }
 
     /// Apparent quad half-size in meters for a magnitude, at sphereRadius.
+    /// A steep falloff gives a strong, pro-app contrast between the few bright
+    /// stars (large, glinting) and the faint background stars (small dots).
     static func starSize(magnitude: Double) -> Float {
-        let size = 0.95 * pow(0.80, magnitude)
-        return Float(min(1.8, max(0.16, size)))
+        let size = 1.2 * pow(0.72, magnitude)
+        return Float(min(2.8, max(0.12, size)))
     }
 
     /// Build the batched star-field entity: one textured child per color
@@ -176,10 +178,10 @@ enum SkySceneBuilder {
             let bucket = colorBucket(forColorIndex: star.colorIndex)
             let direction = equatorialVector(star.equatorialJ2000)
             let center = direction * sphereRadius
-            let bright = star.visualMagnitude < 0.5
-            // Sprites carry a transparent margin, so enlarge the quad a touch
-            // (more for the spiked brightest stars) to keep the disk sized.
-            let half = starSize(magnitude: star.visualMagnitude) * (bright ? 2.2 : 1.4)
+            // The brightest ~2 dozen stars get diffraction spikes + extra size
+            // so they read as the recognizable bright stars of the sky.
+            let bright = star.visualMagnitude < 1.5
+            let half = starSize(magnitude: star.visualMagnitude) * (bright ? 2.3 : 1.4)
             if bright {
                 appendQuad(center: center, radialDirection: direction, halfSize: half,
                            vertices: &spikeV[bucket], indices: &spikeI[bucket], uvs: &spikeUV[bucket])
@@ -894,6 +896,25 @@ enum SkySceneBuilder {
             let p1 = center + (t1 * cos(a1) + t2 * sin(a1)) * radius
             appendSegment(from: p0, to: p1, width: width, vertices: &vertices, indices: &indices)
         }
+    }
+
+    /// A billboarded, oversized textured quad showing a deep-sky object's real
+    /// photo, placed on the sphere and oriented to face the viewer. Sized from
+    /// the true angular size but enlarged (and floored) so it's easy to find.
+    static func makeDeepSkySprite(texture: TextureResource, direction: SIMD3<Float>,
+                                  angularSizeRadians: Double?) -> Entity {
+        let trueHalf = Float((angularSizeRadians ?? 0.01) / 2) * sphereRadius
+        let half = min(9.0, max(2.6, trueHalf * 3.2))
+        var material = UnlitMaterial(color: .white)
+        material.color = .init(tint: .white, texture: .init(texture))
+        material.blending = .transparent(opacity: .init(floatLiteral: 0.95))
+        let mesh = MeshResource.generatePlane(width: half * 2, height: half * 2, cornerRadius: half * 0.12)
+        let holder = Entity()
+        holder.addChild(ModelEntity(mesh: mesh, materials: [material]))
+        let position = direction * sphereRadius
+        holder.position = position
+        orientTowardCenter(holder, at: position)
+        return holder
     }
 
     // MARK: Labels

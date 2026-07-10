@@ -183,6 +183,36 @@ final class SkyRenderer: NSObject {
         updateTimer = timer
 
         tick()
+
+        // Overlay real-photo sprites on deep-sky showpieces, loaded lazily after
+        // the scene's first paint so startup stays snappy.
+        Task { @MainActor [weak self] in await self?.loadDeepSkySprites() }
+    }
+
+    /// Attach real-photo sprites for the brightest deep-sky objects that have a
+    /// bundled image, yielding between each so the frame never stalls.
+    private func loadDeepSkySprites() async {
+        let showpieces = appState.catalog.deepSky
+            .filter { ObjectImagery.hasImage(for: $0) && $0.visualMagnitude <= 9.0 }
+            .sorted { $0.visualMagnitude < $1.visualMagnitude }
+            .prefix(30)
+        for object in showpieces {
+            let direction = SkySceneBuilder.equatorialVector(object.equatorialJ2000)
+            let size = AngularSizeSource.angularSizeRadians(for: object, julianDate: 2_451_545.0)
+            guard let cg = ObjectImagery.thumbnailCGImage(deepSkyID: object.id, maxPixel: 256),
+                  let texture = try? await TextureResource(image: cg, withName: "sprite_\(object.id)",
+                                                           options: .init(semantic: .color)) else {
+                await Task.yield()
+                continue
+            }
+            let sprite = SkySceneBuilder.makeDeepSkySprite(texture: texture, direction: direction,
+                                                           angularSizeRadians: size)
+            sprite.name = "sprite.\(object.id)"
+            deepSkyMarkers.addChild(sprite)
+            // Hide the small ring glyph now that the photo stands in for it.
+            deepSkyMarkers.children.first { $0.name == object.id }?.isEnabled = false
+            await Task.yield()
+        }
     }
 
     /// Capture the current sky view (camera feed + overlay in AR mode) and
