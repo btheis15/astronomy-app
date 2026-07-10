@@ -85,7 +85,7 @@ struct TelescopeSection: View {
                 Label(assessment.verdict.rawValue, systemImage: assessment.verdict.systemImage)
                     .font(.subheadline.weight(.semibold))
                 Spacer()
-                Text(eyepiece.name).font(.caption).foregroundStyle(.secondary)
+                eyepiecePicker(current: eyepiece)
             }
             Text(assessment.reason).font(.caption).foregroundStyle(.secondary)
         } header: {
@@ -96,6 +96,34 @@ struct TelescopeSection: View {
                      ? "Both show the same field of view at \(Int(optics.magnification))×: a real survey photo (left) and a simulation (right)."
                      : "Left: a real photograph. Right: a simulation of the eyepiece view.")
             }
+        }
+    }
+
+    /// A tappable eyepiece switcher that drives the preview. Shown right by the
+    /// preview so it's obvious you can change lenses.
+    @ViewBuilder
+    private func eyepiecePicker(current: Eyepiece) -> some View {
+        Menu {
+            ForEach(appState.equipment.eyepieces) { ep in
+                Button {
+                    selectedEyepieceID = ep.id
+                } label: {
+                    if ep.id == current.id {
+                        Label(ep.name, systemImage: "checkmark")
+                    } else {
+                        Text(ep.name)
+                    }
+                }
+            }
+        } label: {
+            HStack(spacing: 4) {
+                Image(systemName: "eyeglasses")
+                Text(current.name)
+                Image(systemName: "chevron.up.chevron.down").font(.caption2)
+            }
+            .font(.caption.weight(.semibold))
+            .padding(.horizontal, 10).padding(.vertical, 5)
+            .background(.quaternary, in: Capsule())
         }
     }
 
