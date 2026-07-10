@@ -45,7 +45,7 @@ enum ObjectImagery {
     }
 
     /// Short credit line shown wherever the photos appear.
-    static let attribution = "Deep-sky & star photos: Wikimedia Commons (NASA / ESA & contributors). Planet maps: Solar System Scope (CC BY 4.0)."
+    static let attribution = "Messier photos: NASA / ESA Hubble. Other deep-sky & star photos: Wikimedia Commons. Planet maps: Solar System Scope (CC BY 4.0)."
 
     // MARK: Mapping
 
