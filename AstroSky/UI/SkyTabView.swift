@@ -13,6 +13,7 @@ struct SkyTabView: View {
     @Environment(AppState.self) private var appState
     @State private var guide: GuideReadout?
     @State private var showSearch = false
+    @State private var showCalibrationSheet = false
 
     /// Effective display mode: honours the stored preference but falls back to
     /// VR (motion-tracked) when AR isn't available (e.g. Simulator).
@@ -133,11 +134,37 @@ struct SkyTabView: View {
             hudButton(systemImage: "clock", label: "Time travel controls") {
                 showTimeControls.toggle()
             }
-            // Mode toggle: cycles AR → VR (immersive) → Free-look → AR.
-            // Icon shows what you'll switch TO.
-            hudButton(systemImage: nextModeIcon, label: nextModeLabel) {
-                cycleSkyMode()
+            // Mode menu: shows the current mode icon and lists all three options.
+            Menu {
+                Button {
+                    appState.skyDisplayMode = .ar
+                } label: {
+                    if effectiveMode == .ar { Label("AR Camera", systemImage: "checkmark") }
+                    else { Text("AR Camera") }
+                }
+                .disabled(!ARWorldTrackingConfiguration.isSupported)
+
+                Button {
+                    appState.skyDisplayMode = .vr
+                } label: {
+                    if effectiveMode == .vr { Label("Immersive (gyroscope)", systemImage: "checkmark") }
+                    else { Text("Immersive (gyroscope)") }
+                }
+
+                Button {
+                    appState.skyDisplayMode = .freeLook
+                } label: {
+                    if effectiveMode == .freeLook { Label("Free-look (drag)", systemImage: "checkmark") }
+                    else { Text("Free-look (drag)") }
+                }
+            } label: {
+                Image(systemName: currentModeIcon)
+                    .font(.system(size: 17, weight: .medium))
+                    .frame(width: 40, height: 40)
+                    .background(.ultraThinMaterial, in: Circle())
             }
+            .accessibilityLabel("Sky view mode")
+
             hudButton(systemImage: isCapturing ? "camera.fill" : "camera", label: "Take photo") {
                 capturePhoto()
             }
@@ -166,6 +193,14 @@ struct SkyTabView: View {
         }
     }
 
+    private var currentModeIcon: String {
+        switch effectiveMode {
+        case .ar:       return "camera.viewfinder"
+        case .vr:       return "moon.stars.fill"
+        case .freeLook: return "move.3d"
+        }
+    }
+
     private var locationBadge: some View {
         HStack(spacing: 6) {
             Image(systemName: appState.locationService.hasRealLocation
@@ -184,10 +219,10 @@ struct SkyTabView: View {
     }
 
     /// Compass heading-accuracy chip: green when well-calibrated, amber/red as
-    /// it degrades. Tapping isn't needed — it's a passive calibration cue.
+    /// it degrades. Tap when red to show calibration instructions.
     private func headingChip(accuracy: Double) -> some View {
-        let color: Color = accuracy <= 15 ? .green : (accuracy <= 30 ? .yellow : .red)
-        return HStack(spacing: 4) {
+        let color: Color = accuracy <= 10 ? .green : (accuracy <= 25 ? .yellow : .red)
+        let chip = HStack(spacing: 4) {
             Image(systemName: "safari")
             Text("±\(Int(accuracy.rounded()))°")
                 .monospacedDigit()
@@ -198,6 +233,18 @@ struct SkyTabView: View {
         .padding(.vertical, 6)
         .background(.ultraThinMaterial, in: Capsule())
         .accessibilityLabel("Compass accuracy plus or minus \(Int(accuracy.rounded())) degrees")
+
+        return Group {
+            if color == .red {
+                Button { showCalibrationSheet = true } label: { chip }
+                    .buttonStyle(.plain)
+                    .sheet(isPresented: $showCalibrationSheet) {
+                        CompassCalibrationSheet()
+                    }
+            } else {
+                chip
+            }
+        }
     }
 
     private func hudButton(systemImage: String, label: String = "", action: @escaping () -> Void) -> some View {
@@ -369,5 +416,31 @@ struct ObjectCardView: View {
             altStr = AstroFormat.degrees(pos.horizontal.altitude)
             azStr = AstroFormat.azimuth(pos.horizontal)
         }
+    }
+}
+
+// MARK: - Compass calibration
+
+private struct CompassCalibrationSheet: View {
+    @Environment(\.dismiss) private var dismiss
+
+    var body: some View {
+        NavigationStack {
+            VStack(alignment: .leading, spacing: 20) {
+                Label("Move away from metal surfaces, magnets, or a magnetic phone case.", systemImage: "exclamationmark.triangle")
+                Label("Hold the phone in front of you and slowly rotate your wrist in a figure-8 pattern until the chip turns green.", systemImage: "arrow.triangle.2.circlepath")
+                Label("Use the two-finger drag in the sky view to fine-align the overlay after calibrating.", systemImage: "hand.draw")
+            }
+            .font(.subheadline)
+            .padding()
+            .navigationTitle("Calibrate Compass")
+            .navigationBarTitleDisplayMode(.inline)
+            .toolbar {
+                ToolbarItem(placement: .confirmationAction) {
+                    Button("Done") { dismiss() }
+                }
+            }
+        }
+        .presentationDetents([.medium])
     }
 }

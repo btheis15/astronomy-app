@@ -10,6 +10,7 @@ struct SettingsView: View {
     @Environment(AppState.self) private var appState
     @State private var manualLatitude = ""
     @State private var manualLongitude = ""
+    @State private var locationError = false
 
     var body: some View {
         @Bindable var appState = appState
@@ -165,13 +166,23 @@ struct SettingsView: View {
                 Button("Set") {
                     if let lat = Double(manualLatitude), let lon = Double(manualLongitude),
                        abs(lat) <= 90, abs(lon) <= 180 {
+                        locationError = false
                         appState.locationService.setManualLocation(latitudeDegrees: lat,
                                                                    longitudeDegrees: lon)
+                        manualLatitude = ""
+                        manualLongitude = ""
+                    } else {
+                        locationError = true
                     }
                 }
                 .disabled(Double(manualLatitude) == nil || Double(manualLongitude) == nil)
             }
             .font(.subheadline)
+            if locationError {
+                Text("Enter a valid latitude (−90 to 90) and longitude (−180 to 180).")
+                    .font(.caption)
+                    .foregroundStyle(.red)
+            }
         } header: {
             Text("Location")
         } footer: {

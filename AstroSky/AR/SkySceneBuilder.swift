@@ -898,24 +898,6 @@ enum SkySceneBuilder {
         }
     }
 
-    /// A billboarded, oversized textured quad showing a deep-sky object's real
-    /// photo, placed on the sphere and oriented to face the viewer. Sized from
-    /// the true angular size but enlarged (and floored) so it's easy to find.
-    static func makeDeepSkySprite(texture: TextureResource, direction: SIMD3<Float>,
-                                  angularSizeRadians: Double?) -> Entity {
-        let trueHalf = Float((angularSizeRadians ?? 0.01) / 2) * sphereRadius
-        let half = min(9.0, max(2.6, trueHalf * 3.2))
-        var material = UnlitMaterial(color: .white)
-        material.color = .init(tint: .white, texture: .init(texture))
-        material.blending = .transparent(opacity: .init(floatLiteral: 0.95))
-        let mesh = MeshResource.generatePlane(width: half * 2, height: half * 2, cornerRadius: half * 0.12)
-        let holder = Entity()
-        holder.addChild(ModelEntity(mesh: mesh, materials: [material]))
-        let position = direction * sphereRadius
-        holder.position = position
-        orientTowardCenter(holder, at: position)
-        return holder
-    }
 
     // MARK: Labels
 

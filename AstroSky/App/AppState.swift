@@ -122,6 +122,7 @@ final class AppState {
         showCoordinateGrid = ud.object(forKey: "showCoordinateGrid") == nil ? false : ud.bool(forKey: "showCoordinateGrid")
         hasOnboarded = ud.object(forKey: "hasOnboarded") == nil ? false : ud.bool(forKey: "hasOnboarded")
         passNotificationsEnabled = ud.object(forKey: "passNotificationsEnabled") == nil ? false : ud.bool(forKey: "passNotificationsEnabled")
+        skyAlignmentOffset = Float(ud.double(forKey: "skyAlignmentOffset"))
 
         // Load integer and double settings with zero-check for defaults
         let storedBortle = ud.integer(forKey: "bortleClass")
@@ -240,7 +241,9 @@ final class AppState {
     /// Manual fine-alignment of the AR sky overlay about the zenith axis,
     /// in radians. Set by a two-finger horizontal drag in AR mode; lives here
     /// so it survives tab switches and AR-view rebuilds.
-    var skyAlignmentOffset: Float = 0
+    var skyAlignmentOffset: Float = 0 {
+        didSet { UserDefaults.standard.set(Double(skyAlignmentOffset), forKey: "skyAlignmentOffset") }
+    }
     var hasAlignmentOffset: Bool { abs(skyAlignmentOffset) > 0.0001 }
     func resetAlignment() { skyAlignmentOffset = 0 }
 
