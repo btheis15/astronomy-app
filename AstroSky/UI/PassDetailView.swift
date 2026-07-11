@@ -18,32 +18,28 @@ struct PassDetailView: View {
         appState.satelliteService.satellite(withID: pass.satelliteID)
     }
 
-    /// Alt/az samples across the pass (every ~10 s), above the horizon.
-    private var samples: [PassSample] {
-        guard let satellite else { return [] }
-        let observer = appState.observer
-        let total = pass.end.timeIntervalSince(pass.start)
-        guard total > 0 else { return [] }
-        let step = max(5.0, total / 80.0)
-        var result: [PassSample] = []
-        var t = pass.start.timeIntervalSince1970
-        let end = pass.end.timeIntervalSince1970
-        while t <= end {
-            let date = Date(timeIntervalSince1970: t)
-            let jd = AstroTime.julianDate(date)
-            if let observation = satellite.observe(julianDate: jd, observer: observer),
-               observation.horizontal.altitude > -0.02 {
-                result.append(PassSample(date: date, horizontal: observation.horizontal))
-            }
-            t += step
-        }
-        return result
+    // MARK: - Cached expensive computations
+
+    /// All SGP4-derived data for this pass, computed once in a .task.
+    private struct PassData {
+        var samples: [PassSample]
+        var startCompass: String
+        var endCompass: String
+        var rangeAtPeakKm: Double?
+    }
+
+    @State private var passData: PassData = PassData(samples: [], startCompass: "—",
+                                                     endCompass: "—", rangeAtPeakKm: nil)
+
+    /// Stable key: the pass identity never changes, so we compute exactly once.
+    private var passKey: String {
+        "\(pass.satelliteID)|\(pass.start.timeIntervalSince1970)"
     }
 
     var body: some View {
         List {
             Section {
-                PassSkyChart(samples: samples,
+                PassSkyChart(samples: passData.samples,
                              start: pass.start, peak: pass.peak, end: pass.end)
                     .frame(height: 300)
                     .listRowInsets(EdgeInsets())
@@ -51,15 +47,15 @@ struct PassDetailView: View {
             }
 
             Section("Pass") {
-                row("Starts", "\(AstroFormat.time(pass.start)) · \(compass(at: pass.start))")
-                row("Peak", "\(AstroFormat.time(pass.peak)) · \(AstroFormat.degrees(pass.maxAltitude))")
-                row("Ends", "\(AstroFormat.time(pass.end)) · \(compass(at: pass.end))")
-                row("Duration", durationString)
-                if let range = rangeAtPeakKm {
-                    row("Range at peak", String(format: "%.0f km", range))
+                DetailRow(label: "Starts", value: "\(AstroFormat.time(pass.start)) · \(passData.startCompass)")
+                DetailRow(label: "Peak", value: "\(AstroFormat.time(pass.peak)) · \(AstroFormat.degrees(pass.maxAltitude))")
+                DetailRow(label: "Ends", value: "\(AstroFormat.time(pass.end)) · \(passData.endCompass)")
+                DetailRow(label: "Duration", value: durationString)
+                if let range = passData.rangeAtPeakKm {
+                    DetailRow(label: "Range at peak", value: String(format: "%.0f km", range))
                 }
                 if let magnitude = pass.peakMagnitude {
-                    row("Peak brightness", "mag \(String(format: "%.1f", magnitude))")
+                    DetailRow(label: "Peak brightness", value: "mag \(String(format: "%.1f", magnitude))")
                 }
             }
         }
@@ -78,32 +74,57 @@ struct PassDetailView: View {
                 }
             }
         }
+        // Compute all SGP4-derived data once (the pass is immutable).
+        .task(id: passKey) {
+            guard let satellite else { return }
+            let observer = appState.observer
+            let passStart = pass.start
+            let passEnd = pass.end
+            let passPeak = pass.peak
+
+            passData = await Task.detached(priority: .userInitiated) {
+                // Build alt/az track samples (~80 SGP4 propagations).
+                let total = passEnd.timeIntervalSince(passStart)
+                var samples: [PassSample] = []
+                if total > 0 {
+                    let step = max(5.0, total / 80.0)
+                    var t = passStart.timeIntervalSince1970
+                    let end = passEnd.timeIntervalSince1970
+                    while t <= end {
+                        let date = Date(timeIntervalSince1970: t)
+                        let jd = AstroTime.julianDate(date)
+                        if let observation = satellite.observe(julianDate: jd, observer: observer),
+                           observation.horizontal.altitude > -0.02 {
+                            samples.append(PassSample(date: date, horizontal: observation.horizontal))
+                        }
+                        t += step
+                    }
+                }
+
+                // Compass directions at rise and set.
+                func compass(at date: Date) -> String {
+                    guard let obs = satellite.observe(julianDate: AstroTime.julianDate(date),
+                                                      observer: observer) else { return "—" }
+                    return obs.horizontal.compassDirection
+                }
+                let startCompass = compass(at: passStart)
+                let endCompass = compass(at: passEnd)
+
+                // Range at peak.
+                let rangeAtPeakKm = satellite.observe(julianDate: AstroTime.julianDate(passPeak),
+                                                      observer: observer)?.rangeKm
+
+                return PassData(samples: samples,
+                                startCompass: startCompass,
+                                endCompass: endCompass,
+                                rangeAtPeakKm: rangeAtPeakKm)
+            }.value
+        }
     }
 
     private var durationString: String {
         let seconds = Int(pass.end.timeIntervalSince(pass.start))
         return "\(seconds / 60) min \(seconds % 60) s"
-    }
-
-    private var rangeAtPeakKm: Double? {
-        satellite?.observe(julianDate: AstroTime.julianDate(pass.peak),
-                           observer: appState.observer)?.rangeKm
-    }
-
-    private func compass(at date: Date) -> String {
-        guard let satellite,
-              let observation = satellite.observe(julianDate: AstroTime.julianDate(date),
-                                                  observer: appState.observer) else { return "—" }
-        return observation.horizontal.compassDirection
-    }
-
-    private func row(_ label: String, _ value: String) -> some View {
-        HStack {
-            Text(label).foregroundStyle(.secondary)
-            Spacer()
-            Text(value).monospacedDigit()
-        }
-        .font(.subheadline)
     }
 }
 

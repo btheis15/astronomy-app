@@ -66,7 +66,7 @@ final class SkyRenderer: NSObject {
     private let selectionHighlight: Entity
     private var satelliteEntities: [String: Entity] = [:]
     private let satelliteRoot = Entity()
-    private var satelliteTrack = Entity()
+    private let satelliteTrack = Entity()
     private var meteorRadiants = Entity()
     private var lastActiveShowers: Set<String> = []
     private var lastShowerDay = Int.min
@@ -477,9 +477,7 @@ final class SkyRenderer: NSObject {
         // Nothing selected: clear an existing track once, then stay idle.
         guard let satellite else {
             if lastTrackID != nil {
-                satelliteTrack.removeFromParent()
-                satelliteTrack = Entity()
-                worldAnchor.addChild(satelliteTrack)
+                satelliteTrack.children.removeAll()
                 lastTrackID = nil
             }
             return
@@ -491,9 +489,7 @@ final class SkyRenderer: NSObject {
         lastTrackID = satellite.id
         lastTrackJD = jd
 
-        satelliteTrack.removeFromParent()
-        satelliteTrack = Entity()
-        worldAnchor.addChild(satelliteTrack)
+        satelliteTrack.children.removeAll()
 
         let radius = SkySceneBuilder.sphereRadius * 0.9
         let points: [SIMD3<Float>?] = stride(from: -600.0, through: 600.0, by: 15.0).map { offset in

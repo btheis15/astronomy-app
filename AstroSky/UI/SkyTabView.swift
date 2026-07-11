@@ -312,6 +312,10 @@ struct TimeControlBar: View {
     @Environment(AppState.self) private var appState
     @Binding var isExpanded: Bool
 
+    private let halfDaySeconds: TimeInterval = 43_200
+    private let oneDaySeconds: TimeInterval = 86_400
+    private let fiveMinuteStep: TimeInterval = 300
+
     var body: some View {
         @Bindable var appState = appState
         VStack(spacing: 8) {
@@ -328,7 +332,7 @@ struct TimeControlBar: View {
                 .buttonStyle(.plain)
             }
 
-            Slider(value: $appState.timeOffset, in: -43_200...43_200, step: 300) {
+            Slider(value: $appState.timeOffset, in: -halfDaySeconds...halfDaySeconds, step: fiveMinuteStep) {
                 Text("Time offset")
             } minimumValueLabel: {
                 Text("−12h").font(.caption2)
@@ -337,10 +341,10 @@ struct TimeControlBar: View {
             }
 
             HStack(spacing: 10) {
-                timeJumpButton("−1d", seconds: -86_400)
+                timeJumpButton("−1d", seconds: -oneDaySeconds)
                 timeJumpButton("−1h", seconds: -3600)
                 timeJumpButton("+1h", seconds: 3600)
-                timeJumpButton("+1d", seconds: 86_400)
+                timeJumpButton("+1d", seconds: oneDaySeconds)
             }
         }
         .padding(12)
@@ -365,8 +369,10 @@ struct ObjectCardView: View {
     @State private var altStr = "—"
     @State private var azStr = "—"
 
+    private let positionTicksPerDay: Int = 17280
+
     /// Changes every 5 real seconds — limits how often we rerun ephemeris.
-    private var positionKey: Int { Int(appState.skyJulianDate * 17280) }
+    private var positionKey: Int { Int(appState.skyJulianDate * Double(positionTicksPerDay)) }
 
     var body: some View {
         HStack(spacing: 12) {

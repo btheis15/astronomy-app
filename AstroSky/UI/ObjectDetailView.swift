@@ -16,6 +16,26 @@ struct ObjectDetailView: View {
     @State private var showLogSheet = false
     @ScaledMetric private var headerIconSize: CGFloat = 46
 
+    // MARK: - Cached expensive computations
+
+    /// Cached sky position — recomputed only every ~5 s of real time.
+    @State private var cachedPosition: SkyPosition? = nil
+
+    /// Cached rise/set events — recomputed only when the day changes.
+    @State private var cachedRiseSet: RiseSetEvents? = nil
+
+    /// Cached info rows — recomputed only every ~5 s of real time.
+    @State private var cachedInfoRows: [(label: String, value: String)] = []
+
+    /// Changes roughly every 5 s of simulated sky time (17280 ticks per day).
+    private var positionKey: Int { Int(appState.skyJulianDate * 17280) }
+
+    /// Changes when the calendar day (or observer location) changes.
+    private var dayKey: String {
+        let day = Int(Calendar.current.startOfDay(for: appState.skyDate).timeIntervalSince1970)
+        return "\(object.id)|\(day)|\(Int(appState.observer.latitude * 100))|\(Int(appState.observer.longitude * 100))"
+    }
+
     var body: some View {
         List {
             photoHeroSection
@@ -60,6 +80,30 @@ struct ObjectDetailView: View {
         .sheet(isPresented: $showLogSheet) {
             LogObservationSheet(object: object)
         }
+        // Recompute position and info rows every ~5 s of sky time.
+        .task(id: positionKey) {
+            let jd = appState.skyJulianDate
+            let observer = appState.observer
+            cachedPosition = object.skyPosition(julianDate: jd, observer: observer)
+            cachedInfoRows = object.infoRows(julianDate: jd, observer: observer)
+        }
+        // Recompute rise/set once per day (expensive bisection search).
+        .task(id: dayKey) {
+            guard object.kind != .satellite else {
+                cachedRiseSet = nil
+                return
+            }
+            let dayStart = Calendar.current.startOfDay(for: appState.skyDate)
+            let observer = appState.observer
+            let thresh = threshold
+            let obj = object
+            cachedRiseSet = await Task.detached(priority: .userInitiated) {
+                RiseSetCalculator.events(startingAt: dayStart, threshold: thresh) { date in
+                    let jd = AstroTime.julianDate(date)
+                    return obj.horizontal(julianDate: jd, observer: observer).altitude
+                }
+            }.value
+        }
     }
 
     @ViewBuilder private var photoHeroSection: some View {
@@ -91,18 +135,23 @@ struct ObjectDetailView: View {
     }
 
     private var positionSection: some View {
-        let position = object.skyPosition(julianDate: appState.skyJulianDate,
-                                          observer: appState.observer)
-        return Section("Position now") {
-            row("Altitude", AstroFormat.degrees(position.horizontal.altitude))
-            row("Azimuth", AstroFormat.azimuth(position.horizontal))
-            row("Right ascension", AstroFormat.rightAscension(position.equatorialJ2000))
-            row("Declination", AstroFormat.declination(position.equatorialJ2000))
-            if let distance = position.distanceDescription {
-                row("Distance", distance)
+        Section("Position now") {
+            if let position = cachedPosition {
+                DetailRow(label: "Altitude", value: AstroFormat.degrees(position.horizontal.altitude))
+                DetailRow(label: "Azimuth", value: AstroFormat.azimuth(position.horizontal))
+                DetailRow(label: "Right ascension", value: AstroFormat.rightAscension(position.equatorialJ2000))
+                DetailRow(label: "Declination", value: AstroFormat.declination(position.equatorialJ2000))
+                if let distance = position.distanceDescription {
+                    DetailRow(label: "Distance", value: distance)
+                }
+                DetailRow(label: "Visibility", value: position.horizontal.isAboveHorizon
+                    ? "Above the horizon" : "Below the horizon")
+            } else {
+                DetailRow(label: "Altitude", value: "—")
+                DetailRow(label: "Azimuth", value: "—")
+                DetailRow(label: "Right ascension", value: "—")
+                DetailRow(label: "Declination", value: "—")
             }
-            row("Visibility", position.horizontal.isAboveHorizon
-                ? "Above the horizon" : "Below the horizon")
         }
     }
 
@@ -110,25 +159,22 @@ struct ObjectDetailView: View {
         // Satellites move too fast for daily rise/set to be meaningful.
         Group {
             if object.kind != .satellite {
-                let dayStart = Calendar.current.startOfDay(for: appState.skyDate)
-                let observer = appState.observer
-                let events = RiseSetCalculator.events(startingAt: dayStart,
-                                                      threshold: threshold) { date in
-                    let jd = AstroTime.julianDate(date)
-                    return object.horizontal(julianDate: jd, observer: observer).altitude
-                }
                 Section("Today") {
-                    if events.alwaysUp {
-                        row("Visibility", "Circumpolar — up all day")
-                    } else if events.alwaysDown {
-                        row("Visibility", "Never rises today")
+                    if let events = cachedRiseSet {
+                        if events.alwaysUp {
+                            DetailRow(label: "Visibility", value: "Circumpolar — up all day")
+                        } else if events.alwaysDown {
+                            DetailRow(label: "Visibility", value: "Never rises today")
+                        } else {
+                            DetailRow(label: "Rise", value: AstroFormat.time(events.rise))
+                            DetailRow(label: "Set", value: AstroFormat.time(events.set))
+                        }
+                        DetailRow(label: "Transit", value: AstroFormat.time(events.transit))
+                        if let transitAltitude = events.transitAltitude {
+                            DetailRow(label: "Max altitude", value: AstroFormat.degrees(transitAltitude))
+                        }
                     } else {
-                        row("Rise", AstroFormat.time(events.rise))
-                        row("Set", AstroFormat.time(events.set))
-                    }
-                    row("Transit", AstroFormat.time(events.transit))
-                    if let transitAltitude = events.transitAltitude {
-                        row("Max altitude", AstroFormat.degrees(transitAltitude))
+                        ProgressView()
                     }
                 }
             }
@@ -145,21 +191,10 @@ struct ObjectDetailView: View {
 
     private var infoSection: some View {
         Section("Details") {
-            let rows = object.infoRows(julianDate: appState.skyJulianDate,
-                                       observer: appState.observer)
-            ForEach(rows.indices, id: \.self) { index in
-                row(rows[index].label, rows[index].value)
+            ForEach(cachedInfoRows.indices, id: \.self) { index in
+                DetailRow(label: cachedInfoRows[index].label, value: cachedInfoRows[index].value)
             }
         }
-    }
-
-    private func row(_ label: String, _ value: String) -> some View {
-        HStack {
-            Text(label).foregroundStyle(.secondary)
-            Spacer()
-            Text(value).monospacedDigit()
-        }
-        .font(.subheadline)
     }
 }
 
