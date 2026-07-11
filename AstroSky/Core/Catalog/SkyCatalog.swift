@@ -31,8 +31,10 @@ struct SkyCatalog {
     static let allDeepSky: [DeepSkyObject] =
         MessierCatalog.objects + CaldwellCatalog.objects + NGCHighlights.objects
 
-    init() {
-        if let deep = HYGCatalogLoader.loadIfAvailable() {
+    /// Fast synchronous init. Pass pre-loaded HYG stars to upgrade to the deep
+    /// catalog; omit (or pass nil) to use the embedded bright-star list only.
+    init(deepStars: [Star]? = nil) {
+        if let deep = deepStars {
             // Keep the curated bright stars (they carry the keys used by
             // constellation figures) and add HYG stars below the embedded
             // catalog's magnitude floor.

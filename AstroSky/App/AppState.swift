@@ -21,7 +21,7 @@ enum SkyDisplayMode: Int, Hashable {
 final class AppState {
     // MARK: Services & data
 
-    let catalog = SkyCatalog()
+    var catalog = SkyCatalog()   // starts with embedded bright stars; upgraded async in start()
     let satelliteService = SatelliteService()
     let locationService = LocationService()
     let notificationScheduler = PassNotificationScheduler()
@@ -360,9 +360,21 @@ final class AppState {
         // afterwards request it up front.
         if hasOnboarded { locationService.requestLocation() }
         Task {
+            await upgradeToDeepCatalog()
             await satelliteService.start()
             await refreshPassNotifications()
             await refreshEventNotifications()
+        }
+    }
+
+    /// Loads the HYG deep-star catalog off the main actor and swaps it in.
+    /// No-op when hygdata.csv is not bundled.
+    private func upgradeToDeepCatalog() async {
+        let deepStars = await Task.detached(priority: .utility) {
+            HYGCatalogLoader.loadIfAvailable()
+        }.value
+        if let stars = deepStars {
+            catalog = SkyCatalog(deepStars: stars)
         }
     }
 }
