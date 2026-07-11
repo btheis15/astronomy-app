@@ -282,4 +282,20 @@ struct CatalogIntegrityTests {
         #expect(stars.first?.properName == "Sirius")
         #expect(abs((stars.first?.distanceLy ?? 0) - 2.64 * 3.26156) < 0.01)
     }
+
+    @Test func defaultCatalogUsesEmbeddedStarsOnly() {
+        let catalog = SkyCatalog(deepStars: nil)
+        #expect(!catalog.usesDeepCatalog)
+        #expect(catalog.stars.count == StarCatalog.stars.count)
+    }
+
+    @Test func deepStarUpgradeExtendsStarCountAndSetsFlag() {
+        // Construct a star guaranteed to be fainter than the embedded catalog floor.
+        let embeddedFloor = StarCatalog.stars.map(\.visualMagnitude).max() ?? 4.0
+        let extraStar = Star("hyg99999", name: nil, bayer: nil, con: "UMa",
+                             ra: 11.0, dec: 55.0, mag: embeddedFloor + 0.1, bv: 0.5)
+        let catalog = SkyCatalog(deepStars: [extraStar])
+        #expect(catalog.usesDeepCatalog)
+        #expect(catalog.stars.count > StarCatalog.stars.count)
+    }
 }
