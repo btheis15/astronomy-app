@@ -72,9 +72,10 @@ struct EquipmentAndSizeTests {
         library.mountType = .equatorial
         let data = try JSONEncoder().encode(library)
         let decoded = try JSONDecoder().decode(EquipmentLibrary.self, from: data)
-        #expect(decoded.activeTelescope?.name == "S")
+        let activeTelescope = decoded.telescopes.first { $0.id == decoded.activeTelescopeID }
+        #expect(activeTelescope?.name == "S")
         #expect(decoded.mountType == .equatorial)
-        #expect(decoded.opticsResult(bortleClass: 4) == nil)   // no eyepiece yet
+        #expect(decoded.eyepieces.isEmpty)   // no eyepiece yet
     }
 
     @Test func andromedaHasRealSize() {

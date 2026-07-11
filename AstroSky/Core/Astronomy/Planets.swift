@@ -35,6 +35,9 @@ enum Planet: String, CaseIterable, Identifiable, Sendable {
         }
     }
 
+    /// Mean semi-major axis in AU (J2000 value from JPL Keplerian elements).
+    var semiMajorAxisAU: Double { PlanetEphemeris.semiMajorAxisAU(self) }
+
     /// Mean equatorial radius in kilometers.
     var radiusKm: Double {
         switch self {
@@ -132,6 +135,11 @@ enum PlanetEphemeris {
                            peri: 44.96476227, periDot: -0.32241464,
                            node: 131.78422574, nodeDot: -0.00508664),
     ]
+
+    /// J2000 semi-major axis in AU, sourced from the Keplerian elements table.
+    static func semiMajorAxisAU(_ planet: Planet) -> Double {
+        elements[planet]?.a ?? 1.0
+    }
 
     /// Heliocentric rectangular coordinates in the J2000 ecliptic frame (AU).
     static func heliocentricPosition(of planet: Planet, julianDate jd: Double) -> SIMD3<Double> {

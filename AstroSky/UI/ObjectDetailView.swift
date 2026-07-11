@@ -60,10 +60,10 @@ struct ObjectDetailView: View {
         .toolbar {
             ToolbarItem(placement: .topBarTrailing) {
                 Button {
-                    appState.toggleFavorite(object.id)
+                    appState.favorites.toggle(object.id)
                 } label: {
-                    Image(systemName: appState.isFavorite(object.id) ? "star.fill" : "star")
-                        .foregroundStyle(appState.isFavorite(object.id) ? .yellow : .secondary)
+                    Image(systemName: appState.favorites.isFavorite(object.id) ? "star.fill" : "star")
+                        .foregroundStyle(appState.favorites.isFavorite(object.id) ? .yellow : .secondary)
                 }
             }
             ToolbarItem(placement: .primaryAction) {
