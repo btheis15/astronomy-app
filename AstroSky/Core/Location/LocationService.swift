@@ -9,6 +9,9 @@ import CoreLocation
 import Foundation
 import MapKit
 import Observation
+import OSLog
+
+private let logger = Logger(subsystem: "com.astrosky", category: "location")
 
 @MainActor
 @Observable
@@ -94,7 +97,7 @@ final class LocationService: NSObject, CLLocationManagerDelegate {
     }
 
     nonisolated func locationManager(_ manager: CLLocationManager, didFailWithError error: Error) {
-        // Keep the default/last observer; astronomy still works.
+        logger.error("Location update failed: \(error.localizedDescription, privacy: .public)")
     }
 
     nonisolated func locationManager(_ manager: CLLocationManager, didUpdateHeading newHeading: CLHeading) {

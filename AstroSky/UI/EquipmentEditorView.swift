@@ -35,7 +35,7 @@ struct EquipmentEditorView: View {
         Section {
             Picker("Mount type", selection: Binding(
                 get: { appState.equipment.mountType },
-                set: { appState.setMountType($0) })) {
+                set: { appState.equipment.setMountType($0) })) {
                 ForEach(MountType.allCases) { Text($0.displayName).tag($0) }
             }
             Text(appState.equipment.mountType.beginnerDescription)
@@ -51,7 +51,7 @@ struct EquipmentEditorView: View {
         Section {
             ForEach(appState.equipment.telescopes) { scope in
                 Button {
-                    appState.setActiveTelescope(scope.id)
+                    appState.equipment.setActiveTelescope(scope.id)
                 } label: {
                     HStack {
                         VStack(alignment: .leading) {
@@ -67,7 +67,7 @@ struct EquipmentEditorView: View {
                 }
                 .buttonStyle(.plain)
             }
-            .onDelete { $0.map { appState.equipment.telescopes[$0].id }.forEach(appState.deleteTelescope) }
+            .onDelete { $0.map { appState.equipment.telescopes[$0].id }.forEach(appState.equipment.deleteTelescope) }
             Button { addingTelescope = true } label: { Label("Add telescope", systemImage: "plus") }
         } header: {
             Text("Telescopes")
@@ -78,7 +78,7 @@ struct EquipmentEditorView: View {
         Section {
             ForEach(appState.equipment.eyepieces) { eyepiece in
                 Button {
-                    appState.setActiveEyepiece(eyepiece.id)
+                    appState.equipment.setActiveEyepiece(eyepiece.id)
                 } label: {
                     HStack {
                         VStack(alignment: .leading) {
@@ -94,7 +94,7 @@ struct EquipmentEditorView: View {
                 }
                 .buttonStyle(.plain)
             }
-            .onDelete { $0.map { appState.equipment.eyepieces[$0].id }.forEach(appState.deleteEyepiece) }
+            .onDelete { $0.map { appState.equipment.eyepieces[$0].id }.forEach(appState.equipment.deleteEyepiece) }
             Button { addingEyepiece = true } label: { Label("Add eyepiece", systemImage: "plus") }
         } header: {
             Text("Eyepieces")
@@ -143,7 +143,7 @@ private struct AddTelescopeSheet: View {
                 ToolbarItem(placement: .cancellationAction) { Button("Cancel") { dismiss() } }
                 ToolbarItem(placement: .confirmationAction) {
                     Button("Save") {
-                        appState.addTelescope(Telescope(name: name,
+                        appState.equipment.addTelescope(Telescope(name: name,
                                                         focalLengthMM: Double(focal) ?? 0,
                                                         apertureMM: Double(aperture) ?? 0))
                         dismiss()
@@ -204,7 +204,7 @@ private struct AddEyepieceSheet: View {
                 ToolbarItem(placement: .cancellationAction) { Button("Cancel") { dismiss() } }
                 ToolbarItem(placement: .confirmationAction) {
                     Button("Save") {
-                        appState.addEyepiece(Eyepiece(name: name,
+                        appState.equipment.addEyepiece(Eyepiece(name: name,
                                                       focalLengthMM: Double(focal) ?? 0,
                                                       apparentFOVDegrees: Double(afov) ?? 52))
                         dismiss()

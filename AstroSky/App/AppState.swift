@@ -26,9 +26,8 @@ final class AppState {
     let locationService = LocationService()
     let notificationScheduler = PassNotificationScheduler()
     let eventNotificationScheduler = EventNotificationScheduler()
-    private var _equipment: EquipmentLibrary?
-    private var _favoriteObjectIDs: Set<String> = []
-    private var _favoriteSatelliteIDs: Set<String> = []
+    let equipment = EquipmentStore()
+    let favorites = FavoritesStore()
 
     var observer: Observer { locationService.observer }
 
@@ -134,8 +133,6 @@ final class AppState {
         passNotificationsEnabled = ud.object(forKey: "passNotificationsEnabled") == nil ? false : ud.bool(forKey: "passNotificationsEnabled")
         eventNotificationsEnabled = ud.object(forKey: "eventNotificationsEnabled") == nil ? false : ud.bool(forKey: "eventNotificationsEnabled")
         skyAlignmentOffset = Float(ud.double(forKey: "skyAlignmentOffset"))
-        _favoriteObjectIDs = Set(ud.stringArray(forKey: "favoriteObjectIDs") ?? [])
-        _favoriteSatelliteIDs = Set(ud.stringArray(forKey: "favoriteSatelliteIDs") ?? [])
 
         // Load integer and double settings with zero-check for defaults
         let storedBortle = ud.integer(forKey: "bortleClass")
@@ -159,89 +156,12 @@ final class AppState {
 
     // MARK: Telescope equipment
 
-    var equipment: EquipmentLibrary {
-        get {
-            access(keyPath: \.equipment)
-            if let cached = _equipment { return cached }
-            guard let data = UserDefaults.standard.data(forKey: "equipmentLibrary"),
-                  let library = try? JSONDecoder().decode(EquipmentLibrary.self, from: data) else {
-                _equipment = .empty
-                return .empty
-            }
-            _equipment = library
-            return library
-        }
-        set {
-            withMutation(keyPath: \.equipment) {
-                _equipment = newValue
-                if let data = try? JSONEncoder().encode(newValue) {
-                    UserDefaults.standard.set(data, forKey: "equipmentLibrary")
-                }
-            }
-        }
-    }
-
     /// Optics for the active scope + eyepiece under the current Bortle sky.
     var activeOptics: OpticsResult? { equipment.opticsResult(bortleClass: bortleClass) }
 
-    func addTelescope(_ scope: Telescope) {
-        var library = equipment
-        library.telescopes.append(scope)
-        if library.activeTelescopeID == nil { library.activeTelescopeID = scope.id }
-        equipment = library
-    }
+    // MARK: Favorites
 
-    func addEyepiece(_ eyepiece: Eyepiece) {
-        var library = equipment
-        library.eyepieces.append(eyepiece)
-        if library.activeEyepieceID == nil { library.activeEyepieceID = eyepiece.id }
-        equipment = library
-    }
-
-    func deleteTelescope(_ id: UUID) {
-        var library = equipment
-        library.telescopes.removeAll { $0.id == id }
-        if library.activeTelescopeID == id { library.activeTelescopeID = library.telescopes.first?.id }
-        equipment = library
-    }
-
-    func deleteEyepiece(_ id: UUID) {
-        var library = equipment
-        library.eyepieces.removeAll { $0.id == id }
-        if library.activeEyepieceID == id { library.activeEyepieceID = library.eyepieces.first?.id }
-        equipment = library
-    }
-
-    func setActiveTelescope(_ id: UUID) { var l = equipment; l.activeTelescopeID = id; equipment = l }
-    func setActiveEyepiece(_ id: UUID) { var l = equipment; l.activeEyepieceID = id; equipment = l }
-    func setMountType(_ mount: MountType) { var l = equipment; l.mountType = mount; equipment = l }
-
-    // MARK: Favorites (any object)
-
-    var favoriteObjectIDs: Set<String> {
-        get {
-            access(keyPath: \.favoriteObjectIDs)
-            return _favoriteObjectIDs
-        }
-        set {
-            withMutation(keyPath: \.favoriteObjectIDs) {
-                _favoriteObjectIDs = newValue
-                UserDefaults.standard.set(Array(newValue), forKey: "favoriteObjectIDs")
-            }
-        }
-    }
-
-    func isFavorite(_ id: String) -> Bool { favoriteObjectIDs.contains(id) }
-
-    func toggleFavorite(_ id: String) {
-        var favorites = favoriteObjectIDs
-        if favorites.contains(id) { favorites.remove(id) } else { favorites.insert(id) }
-        favoriteObjectIDs = favorites
-    }
-
-    var favoriteObjects: [any CelestialObject] {
-        favoriteObjectIDs.sorted().compactMap { object(withID: $0) }
-    }
+    var favoriteObjects: [any CelestialObject] { favorites.objects(in: catalog) }
 
     // MARK: Selection & navigation
 
@@ -302,39 +222,22 @@ final class AppState {
 
     // MARK: Satellite favorites & pass notifications
 
-    var favoriteSatelliteIDs: Set<String> {
-        get {
-            access(keyPath: \.favoriteSatelliteIDs)
-            return _favoriteSatelliteIDs
-        }
-        set {
-            withMutation(keyPath: \.favoriteSatelliteIDs) {
-                _favoriteSatelliteIDs = newValue
-                UserDefaults.standard.set(Array(newValue), forKey: "favoriteSatelliteIDs")
-            }
-        }
-    }
-
-    func isFavoriteSatellite(_ id: String) -> Bool { favoriteSatelliteIDs.contains(id) }
-
     func toggleFavoriteSatellite(_ id: String) {
-        var favorites = favoriteSatelliteIDs
-        if favorites.contains(id) { favorites.remove(id) } else { favorites.insert(id) }
-        favoriteSatelliteIDs = favorites
+        favorites.toggleSatellite(id)
         Task { await refreshPassNotifications() }
     }
 
     /// Recompute upcoming visible passes for favorited satellites and schedule
     /// (or clear) their pre-pass notifications.
     func refreshPassNotifications() async {
-        guard passNotificationsEnabled, !favoriteSatelliteIDs.isEmpty else {
+        guard passNotificationsEnabled, !favorites.satelliteIDs.isEmpty else {
             notificationScheduler.cancelAll()
             return
         }
         let observer = observer
-        let favorites = favoriteSatelliteIDs.compactMap { satelliteService.satellite(withID: $0) }
+        let favs = favorites.satelliteIDs.compactMap { satelliteService.satellite(withID: $0) }
         let passes = await Task.detached(priority: .utility) {
-            favorites.flatMap {
+            favs.flatMap {
                 $0.passes(observer: observer, startingAt: Date(), hours: 24)
             }.filter(\.isVisible)
         }.value
