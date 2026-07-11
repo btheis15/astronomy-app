@@ -205,9 +205,8 @@ final class SkyRenderer: NSObject {
 
         tick()
 
-        // Overlay real-photo sprites on deep-sky showpieces, loaded lazily after
-        // the scene's first paint so startup stays snappy.
-        Task { @MainActor [weak self] in await self?.loadDeepSkySprites() }
+        // Photo sprites removed from sky view — objects use circle/ring glyphs
+        // only. Real photos are available in the object detail view.
     }
 
     /// Attach real-photo sprites for the brightest deep-sky objects that have a
