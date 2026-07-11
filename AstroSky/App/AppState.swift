@@ -89,7 +89,10 @@ final class AppState {
     var bortleClass: Int = 4 {
         didSet {
             let clamped = min(9, max(1, bortleClass))
-            if clamped != bortleClass { bortleClass = clamped }
+            guard clamped == bortleClass else {
+                bortleClass = clamped   // re-fires didSet with the valid value, which writes UserDefaults
+                return
+            }
             UserDefaults.standard.set(bortleClass, forKey: "bortleClass")
         }
     }

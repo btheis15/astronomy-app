@@ -100,7 +100,7 @@ struct CatalogView: View {
         case .orrery: OrreryView()
         case .observeTonight: ObserveTonightView()
         case .solarSystem:
-            ObjectListView(title: "Solar System", objects: solarSystemObjects)
+            ObjectListView(title: "Solar System", objects: appState.catalog.solarSystemObjects)
         case .brightStars:
             ObjectListView(title: "Bright Stars",
                            objects: appState.catalog.stars.prefix(300).map { $0 })
@@ -137,13 +137,6 @@ struct CatalogView: View {
         } else {
             Image(systemName: "point.3.connected.trianglepath.dotted")
         }
-    }
-
-    private var solarSystemObjects: [any CelestialObject] {
-        var objects: [any CelestialObject] = [appState.catalog.sun, appState.catalog.moon]
-        objects.append(contentsOf: appState.catalog.planets.map { $0 as any CelestialObject })
-        objects.append(contentsOf: appState.catalog.minorBodies.map { $0 as any CelestialObject })
-        return objects
     }
 
     private var satelliteFooter: some View {

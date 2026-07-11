@@ -31,6 +31,14 @@ struct SkyCatalog {
     static let allDeepSky: [DeepSkyObject] =
         MessierCatalog.objects + CaldwellCatalog.objects + NGCHighlights.objects
 
+    /// Sun, Moon, planets, and minor bodies in presentation order.
+    var solarSystemObjects: [any CelestialObject] {
+        var objects: [any CelestialObject] = [sun, moon]
+        objects.append(contentsOf: planets.map { $0 as any CelestialObject })
+        objects.append(contentsOf: minorBodies.map { $0 as any CelestialObject })
+        return objects
+    }
+
     /// Fast synchronous init. Pass pre-loaded HYG stars to upgrade to the deep
     /// catalog; omit (or pass nil) to use the embedded bright-star list only.
     init(deepStars: [Star]? = nil) {
