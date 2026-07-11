@@ -75,15 +75,19 @@ enum AstroFormat {
 
     static func time(_ date: Date?, timeZone: TimeZone = .current) -> String {
         guard let date else { return "—" }
-        // DateFormatter is expensive to allocate — reuse one static instance.
-        timeFormatter.timeZone = timeZone
-        return timeFormatter.string(from: date)
+        return formatter(for: timeZone).string(from: date)
     }
 
-    private static let timeFormatter: DateFormatter = {
+    private nonisolated(unsafe) static var timeFormatters: [String: DateFormatter] = [:]
+
+    private static func formatter(for timeZone: TimeZone) -> DateFormatter {
+        let key = timeZone.identifier
+        if let cached = timeFormatters[key] { return cached }
         let f = DateFormatter()
         f.timeStyle = .short
         f.dateStyle = .none
+        f.timeZone = timeZone
+        timeFormatters[key] = f
         return f
-    }()
+    }
 }

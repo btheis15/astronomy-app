@@ -8,6 +8,7 @@
 //
 
 import AVFoundation
+import CoreLocation
 import SwiftUI
 
 struct OnboardingView: View {
@@ -15,6 +16,8 @@ struct OnboardingView: View {
     let onFinish: () -> Void
 
     @State private var page = 0
+    @State private var cameraDenied = false
+    @State private var locationDenied = false
 
     var body: some View {
         VStack {
@@ -31,7 +34,15 @@ struct OnboardingView: View {
                     title: "See the real sky",
                     message: "AstroSky overlays stars, planets and satellites on your camera view, so what's on screen lines up with what's above you.",
                     actionTitle: "Enable Camera",
-                    action: { await requestCamera(); advance() }
+                    action: {
+                        await requestCamera()
+                        let status = AVCaptureDevice.authorizationStatus(for: .video)
+                        if status == .denied || status == .restricted {
+                            cameraDenied = true
+                        } else {
+                            advance()
+                        }
+                    }
                 ).tag(0)
 
                 OnboardingPage(
@@ -39,7 +50,17 @@ struct OnboardingView: View {
                     title: "Where you're standing",
                     message: "Your rough location lets AstroSky compute exactly where each object appears in your sky tonight.",
                     actionTitle: "Enable Location",
-                    action: { appState.locationService.requestLocation(); advance() }
+                    action: {
+                        appState.locationService.requestLocation()
+                        // Give the location manager a brief moment to receive the response
+                        try? await Task.sleep(for: .milliseconds(500))
+                        let status = appState.locationService.authorizationStatus
+                        if status == .denied || status == .restricted {
+                            locationDenied = true
+                        } else {
+                            advance()
+                        }
+                    }
                 ).tag(1)
 
                 OnboardingPage(
@@ -52,6 +73,26 @@ struct OnboardingView: View {
             }
             .tabViewStyle(.page)
             .indexViewStyle(.page(backgroundDisplayMode: .always))
+            .alert("Camera Access Denied", isPresented: $cameraDenied) {
+                Button("Open Settings") {
+                    if let url = URL(string: UIApplication.openSettingsURLString) {
+                        UIApplication.shared.open(url)
+                    }
+                }
+                Button("Continue Anyway") { advance() }
+            } message: {
+                Text("Camera access is needed for the AR sky view. You can enable it later in Settings. The immersive (gyroscope) mode works without a camera.")
+            }
+            .alert("Location Access Denied", isPresented: $locationDenied) {
+                Button("Open Settings") {
+                    if let url = URL(string: UIApplication.openSettingsURLString) {
+                        UIApplication.shared.open(url)
+                    }
+                }
+                Button("Continue Anyway") { advance() }
+            } message: {
+                Text("Location lets AstroSky compute exactly where each object is in your sky. You can enable it later in Settings, or enter coordinates manually.")
+            }
         }
         .background(Color.black.ignoresSafeArea())
         .preferredColorScheme(.dark)

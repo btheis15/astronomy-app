@@ -13,9 +13,20 @@ import SwiftUI
 struct ObservationLogView: View {
     @Query(sort: \ObservationLogEntry.date, order: .reverse) private var entries: [ObservationLogEntry]
     @Environment(\.modelContext) private var context
+    @State private var editingEntry: ObservationLogEntry?
 
     private var messierSeen: Int {
         Set(entries.filter(\.isMessier).map(\.objectID)).count
+    }
+
+    private var csvContent: String {
+        var lines = ["Date,Object,Seeing (1-5),Notes"]
+        for entry in entries {
+            let dateStr = entry.date.formatted(date: .abbreviated, time: .shortened)
+            let notes = entry.notes.replacingOccurrences(of: "\"", with: "\"\"")
+            lines.append("\"\(dateStr)\",\"\(entry.objectName)\",\(entry.seeingRating),\"\(notes)\"")
+        }
+        return lines.joined(separator: "\n")
     }
 
     var body: some View {
@@ -30,26 +41,29 @@ struct ObservationLogView: View {
                 Section {
                     ContentUnavailableView("No observations yet",
                                            systemImage: "book.closed",
-                                           description: Text("Tap “Log observation” on any object to start your log."))
+                                           description: Text("Tap \"Log observation\" on any object to start your log."))
                 }
             } else {
                 Section("Entries") {
                     ForEach(entries) { entry in
-                        VStack(alignment: .leading, spacing: 4) {
-                            HStack {
-                                Text(entry.objectName).font(.headline)
-                                Spacer()
-                                if entry.seeingRating > 0 {
-                                    Text(String(repeating: "★", count: entry.seeingRating))
-                                        .foregroundStyle(.yellow).font(.caption)
+                        Button { editingEntry = entry } label: {
+                            VStack(alignment: .leading, spacing: 4) {
+                                HStack {
+                                    Text(entry.objectName).font(.headline).foregroundStyle(.primary)
+                                    Spacer()
+                                    if entry.seeingRating > 0 {
+                                        Text(String(repeating: "★", count: entry.seeingRating))
+                                            .foregroundStyle(.yellow).font(.caption)
+                                    }
+                                }
+                                Text(entry.date.formatted(date: .abbreviated, time: .shortened))
+                                    .font(.caption).foregroundStyle(.secondary)
+                                if !entry.notes.isEmpty {
+                                    Text(entry.notes).font(.subheadline).foregroundStyle(.primary)
                                 }
                             }
-                            Text(entry.date.formatted(date: .abbreviated, time: .shortened))
-                                .font(.caption).foregroundStyle(.secondary)
-                            if !entry.notes.isEmpty {
-                                Text(entry.notes).font(.subheadline)
-                            }
                         }
+                        .buttonStyle(.plain)
                     }
                     .onDelete { indexSet in
                         for index in indexSet { context.delete(entries[index]) }
@@ -58,6 +72,19 @@ struct ObservationLogView: View {
             }
         }
         .navigationTitle("Observing Log")
+        .toolbar {
+            if !entries.isEmpty {
+                ToolbarItem(placement: .navigationBarTrailing) {
+                    ShareLink(
+                        item: csvContent,
+                        preview: SharePreview("Observing Log", image: Image(systemName: "list.star"))
+                    )
+                }
+            }
+        }
+        .sheet(item: $editingEntry) { entry in
+            EditObservationSheet(entry: entry)
+        }
     }
 }
 
@@ -84,6 +111,50 @@ struct MessierProgressRing: View {
             Text("Messier objects seen").font(.subheadline).foregroundStyle(.secondary)
         }
         .accessibilityLabel("\(seen) of \(total) Messier objects seen")
+    }
+}
+
+// MARK: - Edit an existing observation
+
+struct EditObservationSheet: View {
+    @Environment(\.dismiss) private var dismiss
+    @Bindable var entry: ObservationLogEntry
+
+    var body: some View {
+        NavigationStack {
+            Form {
+                Section("Object") {
+                    LabeledContent("Name", value: entry.objectName)
+                    LabeledContent("Date", value: entry.date.formatted(date: .abbreviated, time: .shortened))
+                }
+                Section("Seeing") {
+                    HStack(spacing: 8) {
+                        ForEach(1...5, id: \.self) { value in
+                            Image(systemName: value <= entry.seeingRating ? "star.fill" : "star")
+                                .font(.title3)
+                                .foregroundStyle(value <= entry.seeingRating ? .yellow : .secondary)
+                                .frame(maxWidth: .infinity)
+                                .contentShape(Rectangle())
+                                .onTapGesture { entry.seeingRating = value }
+                                .accessibilityLabel("\(value) star\(value == 1 ? "" : "s")")
+                                .accessibilityAddTraits(value == entry.seeingRating ? .isSelected : [])
+                        }
+                    }
+                }
+                Section("Notes") {
+                    TextField("Notes", text: $entry.notes, axis: .vertical)
+                        .lineLimit(3...8)
+                }
+            }
+            .navigationTitle("Edit Observation")
+            .navigationBarTitleDisplayMode(.inline)
+            .toolbar {
+                ToolbarItem(placement: .confirmationAction) {
+                    Button("Done") { dismiss() }
+                }
+            }
+        }
+        .presentationDetents([.medium, .large])
     }
 }
 

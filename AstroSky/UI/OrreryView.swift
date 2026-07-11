@@ -88,7 +88,7 @@ final class OrreryScene: NSObject {
         root.addChild(sun)
 
         // Orbit rings + planet markers.
-        for planet in Planet.allCases where planet != .earth || true {
+        for planet in Planet.allCases where planet != .earth {
             let a = semiMajorAU(planet)
             root.addChild(makeOrbitRing(radius: sceneRadius(au: a)))
             let marker = ModelEntity(mesh: .generateSphere(radius: markerRadius(planet)),

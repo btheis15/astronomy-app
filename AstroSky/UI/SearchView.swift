@@ -31,6 +31,8 @@ struct SearchView: View {
                             suggestionRow(m31)
                         }
                     }
+                } else if results.isEmpty {
+                    ContentUnavailableView.search(text: debouncedQuery)
                 } else {
                     ForEach(results, id: \.id) { object in
                         resultRow(object)

@@ -20,7 +20,14 @@ struct ExploreTabView: View {
     private var isAR: Bool { ARWorldTrackingConfiguration.isSupported }
 
     var body: some View {
-        ZStack {
+        guard isAR else {
+            return AnyView(ContentUnavailableView(
+                "AR Not Available",
+                systemImage: "xmark.circle",
+                description: Text("This device doesn't support ARKit world tracking. The scale model view requires a device with a motion coprocessor.")
+            ))
+        }
+        return AnyView(ZStack {
             ScaleARView(scene: scene, distanceMode: distanceMode, heightMeters: heightMeters,
                         onSelect: { selected = $0 },
                         onPlacementChange: { isPlaced = $0 })
@@ -47,7 +54,7 @@ struct ExploreTabView: View {
         .sheet(item: $selected) { body in
             BodyInfoSheet(model: body)
                 .presentationDetents([.medium])
-        }
+        })
     }
 
     private var controls: some View {
@@ -69,7 +76,6 @@ struct ExploreTabView: View {
                 ForEach(DistanceMode.allCases, id: \.self) { Text($0.title).tag($0) }
             }
             .pickerStyle(.segmented)
-            .frame(width: 190)
         }
     }
 

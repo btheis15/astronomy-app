@@ -116,6 +116,7 @@ struct PlanetGlyph: View {
             }
         }
         .frame(width: size, height: size)
+        .accessibilityLabel(planet.name)
     }
 
     /// Saturn's disk is inset to leave room for its rings.
@@ -191,6 +192,7 @@ struct SunGlyph: View {
                 .frame(width: size * 0.68, height: size * 0.68)
         }
         .frame(width: size, height: size)
+        .accessibilityLabel("Sun")
     }
 }
 
@@ -210,6 +212,7 @@ struct MoonGlyph: View {
             }
             .clipShape(Circle())
             .frame(width: size, height: size)
+            .accessibilityLabel("Moon")
     }
 }
 
@@ -234,6 +237,7 @@ struct StarGlyph: View {
                 .shadow(color: tint.opacity(0.8), radius: size * 0.06)
         }
         .frame(width: size, height: size)
+        .accessibilityLabel("Star")
     }
 }
 
@@ -254,6 +258,7 @@ struct SatelliteGlyph: View {
         }
         .rotationEffect(.degrees(-18))
         .frame(width: size, height: size)
+        .accessibilityLabel("Satellite")
     }
 
     private func solarPanel(tint: Color) -> some View {
@@ -290,6 +295,7 @@ struct MinorBodyGlyph: View {
             }
             .rotationEffect(.degrees(-18))
             .frame(width: size, height: size)
+            .accessibilityLabel("Minor body")
     }
 }
 
@@ -317,6 +323,7 @@ struct DeepSkyGlyph: View {
             }
         }
         .frame(width: size, height: size)
+        .accessibilityLabel(type.rawValue)
     }
 
     // MARK: Drawing
@@ -465,6 +472,7 @@ struct ConstellationGlyph: View {
             }
         }
         .frame(width: size, height: size)
+        .accessibilityLabel("\(constellation.name) constellation")
     }
 
     struct Projected {
@@ -541,6 +549,25 @@ struct ObjectGlyph: View {
     let object: any CelestialObject
     var size: CGFloat = 28
 
+    /// A short type label read by VoiceOver. Intentionally describes the
+    /// object *kind* (not its name) so it complements, rather than repeats,
+    /// any nearby name text.
+    private var typeLabel: String {
+        switch object.kind {
+        case .planet:
+            if let p = object as? PlanetObject { return p.planet.name }
+            return "Planet"
+        case .sun:    return "Sun"
+        case .moon:   return "Moon"
+        case .deepSky:
+            if let d = object as? DeepSkyObject { return d.type.rawValue }
+            return "Deep sky object"
+        case .star:   return "Star"
+        case .satellite: return "Satellite"
+        case .minorBody: return "Minor body"
+        }
+    }
+
     var body: some View {
         ZStack {
             switch object.kind {
@@ -567,5 +594,9 @@ struct ObjectGlyph: View {
             }
         }
         .frame(width: size, height: size)
+        // Collapse the child glyphs into a single accessibility element so
+        // VoiceOver reads one label instead of entering the ZStack.
+        .accessibilityElement(children: .ignore)
+        .accessibilityLabel(typeLabel)
     }
 }

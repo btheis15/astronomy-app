@@ -212,7 +212,7 @@ struct SkyTabView: View {
                 .lineLimit(1)
         }
         .font(.footnote)
-        .fixedSize(horizontal: true, vertical: false)
+        .frame(minWidth: 80, maxWidth: 220)
         .padding(.horizontal, 10)
         .padding(.vertical, 6)
         .background(.ultraThinMaterial, in: Capsule())

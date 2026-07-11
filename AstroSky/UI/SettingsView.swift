@@ -58,10 +58,11 @@ struct SettingsView: View {
                     Toggle("Starlink constellation", isOn: $appState.showStarlink)
                         .disabled(!appState.showSatellites)
                     Toggle("Notify me before passes", isOn: passNotificationBinding)
+                    Toggle("Notify me before sky events", isOn: eventNotificationBinding)
                 } header: {
                     Text("Satellites")
                 } footer: {
-                    Text("Shows the ISS, Hubble and other naked-eye satellites. The Starlink option adds up to 300 Starlink satellites from live Celestrak data. Star a satellite in the Catalog to get a heads-up 10 minutes before its visible passes.")
+                    Text("Shows the ISS, Hubble and other naked-eye satellites. The Starlink option adds up to 300 Starlink satellites from live Celestrak data. Star a satellite in the Catalog to get a heads-up 10 minutes before its visible passes. Sky-event alerts fire the evening before conjunctions, eclipses, meteor shower peaks, and moon phases.")
                 }
 
                 Section {
@@ -114,6 +115,10 @@ struct SettingsView: View {
                                    value: "\(appState.satelliteService.satellites.count)")
                     LabeledContent("Ephemeris", value: "Meeus / JPL approximations")
                     LabeledContent("Satellite propagator", value: "SGP4 (Vallado)")
+                    Button("Replay intro") {
+                        appState.hasOnboarded = false
+                    }
+                    .foregroundStyle(.indigo)
                 } header: {
                     Text("About")
                 } footer: {
@@ -133,6 +138,20 @@ struct SettingsView: View {
                 Task {
                     if newValue { _ = await appState.notificationScheduler.requestAuthorization() }
                     await appState.refreshPassNotifications()
+                }
+            }
+        )
+    }
+
+    /// Enabling requests notification authorization, then (re)schedules sky-event alerts.
+    private var eventNotificationBinding: Binding<Bool> {
+        Binding(
+            get: { appState.eventNotificationsEnabled },
+            set: { newValue in
+                appState.eventNotificationsEnabled = newValue
+                Task {
+                    if newValue { _ = await appState.eventNotificationScheduler.requestAuthorization() }
+                    await appState.refreshEventNotifications()
                 }
             }
         )

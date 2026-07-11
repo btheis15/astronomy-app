@@ -17,9 +17,12 @@ import ARKit
 import Combine
 import CoreMotion
 import Foundation
+import OSLog
 import RealityKit
 import UIKit
 import simd
+
+private let arLogger = Logger(subsystem: "com.astrosky", category: "ar")
 
 /// What the on-screen guidance arrow should show for a "Find in AR" target.
 struct GuideReadout: Equatable {
@@ -751,6 +754,7 @@ extension SkyRenderer: ARSessionDelegate {
     /// usable (gyroscope-only orientation via NWU CMMotion reference).
     nonisolated func session(_ session: ARSession, didFailWithError error: Error) {
         let nsError = error as NSError
+        arLogger.error("ARSession error \(nsError.code, privacy: .public): \(error.localizedDescription, privacy: .public)")
         guard nsError.domain == "com.apple.arkit.error", nsError.code == 102 else { return }
         Task { @MainActor [weak self] in
             guard let self, self.isARMode else { return }
@@ -765,6 +769,7 @@ extension SkyRenderer: ARSessionDelegate {
     nonisolated func sessionInterruptionEnded(_ session: ARSession) {
         Task { @MainActor [weak self] in
             guard let self, self.isARMode else { return }
+            arLogger.notice("ARSession interruption ended — resetting tracking")
             let configuration = ARWorldTrackingConfiguration()
             configuration.worldAlignment = .gravity
             configuration.planeDetection = []

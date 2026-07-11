@@ -14,6 +14,7 @@ struct TonightView: View {
     @State private var passesLoaded = false
     @State private var brightestFirst = false
     @State private var events: [AstroEvent] = []
+    @State private var eventsLoaded = false
     @State private var twilight: TwilightTimes? = nil
     @State private var moonPhase: MoonEphemeris.PhaseInfo? = nil
     @State private var moonEvents: RiseSetEvents? = nil
@@ -105,6 +106,13 @@ struct TonightView: View {
                     }
                 }
             }
+        } else if !eventsLoaded {
+            Section("Sky events · next 30 days") {
+                HStack {
+                    ProgressView()
+                    Text("Scanning for events…").foregroundStyle(.secondary)
+                }
+            }
         }
     }
 
@@ -114,6 +122,7 @@ struct TonightView: View {
         events = await Task.detached(priority: .utility) {
             EventsEngine.upcoming(observer: observer, startingAt: start, days: 30)
         }.value
+        eventsLoaded = true
     }
 
     // MARK: Sun & twilight
@@ -133,19 +142,21 @@ struct TonightView: View {
     private var moonSection: some View {
         Section("Moon") {
             if let phase = moonPhase {
-                HStack(spacing: 16) {
-                    MoonPhaseView(phase: phase)
-                        .frame(width: 64, height: 64)
-                    VStack(alignment: .leading, spacing: 4) {
-                        Text(phase.phaseName).font(.headline)
-                        Text("\(Int((phase.illuminatedFraction * 100).rounded()))% illuminated")
-                            .font(.subheadline)
-                            .foregroundStyle(.secondary)
+                NavigationLink {
+                    ObjectDetailView(object: appState.catalog.moon)
+                } label: {
+                    HStack(spacing: 16) {
+                        MoonPhaseView(phase: phase)
+                            .frame(width: 64, height: 64)
+                        VStack(alignment: .leading, spacing: 4) {
+                            Text(phase.phaseName).font(.headline)
+                            Text("\(Int((phase.illuminatedFraction * 100).rounded()))% illuminated")
+                                .font(.subheadline)
+                                .foregroundStyle(.secondary)
+                        }
+                        Spacer()
                     }
-                    Spacer()
                 }
-                .contentShape(Rectangle())
-                .onTapGesture { appState.select(appState.catalog.moon) }
             }
 
             if let events = moonEvents {

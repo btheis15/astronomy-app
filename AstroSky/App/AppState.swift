@@ -25,7 +25,10 @@ final class AppState {
     let satelliteService = SatelliteService()
     let locationService = LocationService()
     let notificationScheduler = PassNotificationScheduler()
+    let eventNotificationScheduler = EventNotificationScheduler()
     private var _equipment: EquipmentLibrary?
+    private var _favoriteObjectIDs: Set<String> = []
+    private var _favoriteSatelliteIDs: Set<String> = []
 
     var observer: Observer { locationService.observer }
 
@@ -99,6 +102,10 @@ final class AppState {
         didSet { UserDefaults.standard.set(passNotificationsEnabled, forKey: "passNotificationsEnabled") }
     }
 
+    var eventNotificationsEnabled: Bool = false {
+        didSet { UserDefaults.standard.set(eventNotificationsEnabled, forKey: "eventNotificationsEnabled") }
+    }
+
     init() {
         let ud = UserDefaults.standard
 
@@ -122,7 +129,10 @@ final class AppState {
         showCoordinateGrid = ud.object(forKey: "showCoordinateGrid") == nil ? false : ud.bool(forKey: "showCoordinateGrid")
         hasOnboarded = ud.object(forKey: "hasOnboarded") == nil ? false : ud.bool(forKey: "hasOnboarded")
         passNotificationsEnabled = ud.object(forKey: "passNotificationsEnabled") == nil ? false : ud.bool(forKey: "passNotificationsEnabled")
+        eventNotificationsEnabled = ud.object(forKey: "eventNotificationsEnabled") == nil ? false : ud.bool(forKey: "eventNotificationsEnabled")
         skyAlignmentOffset = Float(ud.double(forKey: "skyAlignmentOffset"))
+        _favoriteObjectIDs = Set(ud.stringArray(forKey: "favoriteObjectIDs") ?? [])
+        _favoriteSatelliteIDs = Set(ud.stringArray(forKey: "favoriteSatelliteIDs") ?? [])
 
         // Load integer and double settings with zero-check for defaults
         let storedBortle = ud.integer(forKey: "bortleClass")
@@ -208,10 +218,11 @@ final class AppState {
     var favoriteObjectIDs: Set<String> {
         get {
             access(keyPath: \.favoriteObjectIDs)
-            return Set(UserDefaults.standard.stringArray(forKey: "favoriteObjectIDs") ?? [])
+            return _favoriteObjectIDs
         }
         set {
             withMutation(keyPath: \.favoriteObjectIDs) {
+                _favoriteObjectIDs = newValue
                 UserDefaults.standard.set(Array(newValue), forKey: "favoriteObjectIDs")
             }
         }
@@ -291,11 +302,11 @@ final class AppState {
     var favoriteSatelliteIDs: Set<String> {
         get {
             access(keyPath: \.favoriteSatelliteIDs)
-            let stored = UserDefaults.standard.stringArray(forKey: "favoriteSatelliteIDs") ?? []
-            return Set(stored)
+            return _favoriteSatelliteIDs
         }
         set {
             withMutation(keyPath: \.favoriteSatelliteIDs) {
+                _favoriteSatelliteIDs = newValue
                 UserDefaults.standard.set(Array(newValue), forKey: "favoriteSatelliteIDs")
             }
         }
@@ -327,6 +338,21 @@ final class AppState {
         await notificationScheduler.reschedule(passes: passes)
     }
 
+    /// Fetch upcoming sky events for the next 30 days and schedule (or clear)
+    /// their evening-before notifications.
+    func refreshEventNotifications() async {
+        guard eventNotificationsEnabled else {
+            await eventNotificationScheduler.cancelAll()
+            return
+        }
+        let observer = observer
+        let start = Date()
+        let events = await Task.detached(priority: .utility) {
+            EventsEngine.upcoming(observer: observer, startingAt: start, days: 30)
+        }.value
+        await eventNotificationScheduler.reschedule(events: events)
+    }
+
     // MARK: Lifecycle
 
     func start() {
@@ -336,6 +362,7 @@ final class AppState {
         Task {
             await satelliteService.start()
             await refreshPassNotifications()
+            await refreshEventNotifications()
         }
     }
 }

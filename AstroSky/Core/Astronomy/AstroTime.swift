@@ -62,18 +62,4 @@ enum AstroTime {
         AstroMath.normalizedRadians(greenwichApparentSiderealTime(julianDate: jd) + longitude)
     }
 
-    /// Approximate ΔT = TT − UT in seconds (Espenak & Meeus polynomial,
-    /// adequate for 2005–2050). Used where dynamical time matters; for the
-    /// visual purposes of this app the ~1 arcsecond effect is negligible,
-    /// but it keeps the ephemeris honest.
-    static func deltaT(julianDate jd: Double) -> Double {
-        let year = 2000.0 + (jd - j2000) / 365.25
-        let t = year - 2000.0
-        return 62.92 + 0.32217 * t + 0.005589 * t * t
-    }
-
-    /// Julian Ephemeris Date (TT) for a given UT Julian Date.
-    static func julianEphemerisDate(julianDate jd: Double) -> Double {
-        jd + deltaT(julianDate: jd) / 86400.0
-    }
 }

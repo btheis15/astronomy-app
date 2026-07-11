@@ -120,6 +120,32 @@ private struct PassSkyChart: View {
     let peak: Date
     let end: Date
 
+    /// Direction label for the first/last sample, e.g. "northeast".
+    private func compassLabel(for sample: PassSample) -> String {
+        let az = sample.horizontal.azimuthDegrees
+        switch az {
+        case 0..<22.5, 337.5..<360: return "north"
+        case 22.5..<67.5:           return "northeast"
+        case 67.5..<112.5:          return "east"
+        case 112.5..<157.5:         return "southeast"
+        case 157.5..<202.5:         return "south"
+        case 202.5..<247.5:         return "southwest"
+        case 247.5..<292.5:         return "west"
+        default:                    return "northwest"
+        }
+    }
+
+    private var accessibilityDescription: String {
+        guard let first = samples.first, let last = samples.last else {
+            return "Sky chart showing satellite pass track"
+        }
+        let peakSample = samples.min { abs($0.date.timeIntervalSince(peak)) < abs($1.date.timeIntervalSince(peak)) }
+        let peakAlt = peakSample.map { Int($0.horizontal.altitudeDegrees.rounded()) } ?? 0
+        let riseDir = compassLabel(for: first)
+        let setDir = compassLabel(for: last)
+        return "Sky chart: satellite rises in the \(riseDir), peaks at \(peakAlt) degrees altitude, sets in the \(setDir)"
+    }
+
     var body: some View {
         Canvas { context, size in
             let radius = min(size.width, size.height) / 2 - 22
@@ -162,6 +188,7 @@ private struct PassSkyChart: View {
             }
             marker(context, at: samples.last!, center: center, radius: radius, color: .orange, label: "End")
         }
+        .accessibilityLabel(accessibilityDescription)
     }
 
     private func marker(_ context: GraphicsContext, at sample: PassSample,

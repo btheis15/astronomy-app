@@ -24,6 +24,39 @@ struct EyepiecePreviewView: View {
         return TelescopeMath.fractionOfField(objectAngularRadians: size, trueFOVRadians: optics.trueFOVRadians)
     }
 
+    /// A VoiceOver description of what the eyepiece simulation shows.
+    private var accessibilityDescription: String {
+        let objectName = object.name
+        let mag = Int(optics.magnification.rounded())
+        let typeLabel: String = {
+            switch object.kind {
+            case .planet:
+                if let p = object as? PlanetObject { return p.planet.name }
+                return "Planet"
+            case .sun:       return "Sun"
+            case .moon:      return "Moon"
+            case .deepSky:
+                if let d = object as? DeepSkyObject { return d.type.rawValue }
+                return "Deep sky object"
+            case .star:      return "Star"
+            case .satellite: return "Satellite"
+            case .minorBody: return "Minor body"
+            }
+        }()
+        let apparentSize: String = {
+            guard fillFraction > 0 else { return "" }
+            switch fillFraction {
+            case ..<0.05: return " Appears as a point of light."
+            case ..<0.15: return " Appears tiny in the field."
+            case ..<0.40: return " Appears small in the field."
+            case ..<0.75: return " Appears moderately large in the field."
+            case ..<1.0:  return " Appears large in the field."
+            default:      return " Extends beyond the field of view."
+            }
+        }()
+        return "Simulated eyepiece view of \(objectName) at \(mag)× magnification. \(typeLabel).\(apparentSize)"
+    }
+
     var body: some View {
         Canvas { context, size in
             let diameter = min(size.width, size.height)
@@ -52,6 +85,7 @@ struct EyepiecePreviewView: View {
             context.stroke(Path(ellipseIn: fieldRect), with: .color(.gray.opacity(0.55)), lineWidth: 2)
         }
         .aspectRatio(1, contentMode: .fit)
+        .accessibilityLabel(accessibilityDescription)
         .overlay(alignment: .bottom) { caption }
     }
 
