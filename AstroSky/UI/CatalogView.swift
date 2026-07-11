@@ -201,10 +201,11 @@ struct ObjectListView: View {
 struct CatalogRow: View {
     @Environment(AppState.self) private var appState
     let object: any CelestialObject
+    @State private var isAboveHorizon = false
+
+    private var positionKey: Int { Int(appState.skyJulianDate * 17280) }
 
     var body: some View {
-        let horizontal = object.horizontal(julianDate: appState.skyJulianDate,
-                                           observer: appState.observer)
         HStack {
             ObjectGlyph(object: object, size: 30)
                 .frame(width: 34)
@@ -230,9 +231,14 @@ struct CatalogRow: View {
                         .foregroundStyle(.secondary)
                 }
                 Circle()
-                    .fill(horizontal.isAboveHorizon ? Color.green : Color.gray.opacity(0.4))
+                    .fill(isAboveHorizon ? Color.green : Color.gray.opacity(0.4))
                     .frame(width: 8, height: 8)
             }
+        }
+        .task(id: positionKey) {
+            let jd = appState.skyJulianDate
+            let obs = appState.observer
+            isAboveHorizon = object.horizontal(julianDate: jd, observer: obs).isAboveHorizon
         }
     }
 }
@@ -240,36 +246,50 @@ struct CatalogRow: View {
 // MARK: - Constellations
 
 struct ConstellationListView: View {
-    @Environment(AppState.self) private var appState
-
     var body: some View {
         List(ConstellationCatalog.constellations) { constellation in
             NavigationLink {
                 ConstellationDetailView(constellation: constellation)
             } label: {
-                HStack {
-                    ConstellationGlyph(constellation: constellation, size: 30)
-                        .frame(width: 34)
-                    VStack(alignment: .leading, spacing: 2) {
-                        Text(constellation.name)
-                        Text("\(constellation.starPairs.count) figure lines · \(constellation.abbreviation)")
-                            .font(.caption)
-                            .foregroundStyle(.secondary)
-                    }
-                    Spacer()
-                    if let center = constellation.centerJ2000 {
-                        let horizontal = CoordinateTransforms.horizontal(
-                            of: CoordinateTransforms.precessFromJ2000(center, julianDate: appState.skyJulianDate),
-                            julianDate: appState.skyJulianDate,
-                            observer: appState.observer)
-                        Circle()
-                            .fill(horizontal.isAboveHorizon ? Color.green : Color.gray.opacity(0.4))
-                            .frame(width: 8, height: 8)
-                    }
-                }
+                ConstellationRow(constellation: constellation)
             }
         }
         .navigationTitle("Constellations")
+    }
+}
+
+private struct ConstellationRow: View {
+    @Environment(AppState.self) private var appState
+    let constellation: Constellation
+    @State private var isAboveHorizon = false
+
+    private var positionKey: Int { Int(appState.skyJulianDate * 17280) }
+
+    var body: some View {
+        HStack {
+            ConstellationGlyph(constellation: constellation, size: 30)
+                .frame(width: 34)
+            VStack(alignment: .leading, spacing: 2) {
+                Text(constellation.name)
+                Text("\(constellation.starPairs.count) figure lines · \(constellation.abbreviation)")
+                    .font(.caption)
+                    .foregroundStyle(.secondary)
+            }
+            Spacer()
+            if constellation.centerJ2000 != nil {
+                Circle()
+                    .fill(isAboveHorizon ? Color.green : Color.gray.opacity(0.4))
+                    .frame(width: 8, height: 8)
+            }
+        }
+        .task(id: positionKey) {
+            guard let center = constellation.centerJ2000 else { return }
+            let jd = appState.skyJulianDate
+            let obs = appState.observer
+            isAboveHorizon = CoordinateTransforms.horizontal(
+                of: CoordinateTransforms.precessFromJ2000(center, julianDate: jd),
+                julianDate: jd, observer: obs).isAboveHorizon
+        }
     }
 }
 
@@ -279,6 +299,11 @@ struct ConstellationListView: View {
 struct ConstellationDetailView: View {
     @Environment(AppState.self) private var appState
     let constellation: Constellation
+    @State private var isAboveHorizon = false
+    @State private var altStr = "—"
+    @State private var compassStr = "—"
+
+    private var positionKey: Int { Int(appState.skyJulianDate * 17280) }
 
     /// Unique member stars of the stick figure, brightest first.
     private var memberStars: [Star] {
@@ -306,17 +331,13 @@ struct ConstellationDetailView: View {
             }
 
             Section {
-                if let center = constellation.centerJ2000 {
-                    let horizontal = CoordinateTransforms.horizontal(
-                        of: CoordinateTransforms.precessFromJ2000(center, julianDate: appState.skyJulianDate),
-                        julianDate: appState.skyJulianDate,
-                        observer: appState.observer)
+                if constellation.centerJ2000 != nil {
                     HStack {
-                        Label(horizontal.isAboveHorizon ? "Up now" : "Below horizon",
-                              systemImage: horizontal.isAboveHorizon ? "eye" : "eye.slash")
-                            .foregroundStyle(horizontal.isAboveHorizon ? .green : .secondary)
+                        Label(isAboveHorizon ? "Up now" : "Below horizon",
+                              systemImage: isAboveHorizon ? "eye" : "eye.slash")
+                            .foregroundStyle(isAboveHorizon ? .green : .secondary)
                         Spacer()
-                        Text("\(AstroFormat.degrees(horizontal.altitude)) · \(horizontal.compassDirection)")
+                        Text("\(altStr) · \(compassStr)")
                             .foregroundStyle(.secondary)
                     }
                     .font(.subheadline)
@@ -348,5 +369,16 @@ struct ConstellationDetailView: View {
         }
         .navigationTitle(constellation.name)
         .navigationBarTitleDisplayMode(.inline)
+        .task(id: positionKey) {
+            guard let center = constellation.centerJ2000 else { return }
+            let jd = appState.skyJulianDate
+            let obs = appState.observer
+            let h = CoordinateTransforms.horizontal(
+                of: CoordinateTransforms.precessFromJ2000(center, julianDate: jd),
+                julianDate: jd, observer: obs)
+            isAboveHorizon = h.isAboveHorizon
+            altStr = AstroFormat.degrees(h.altitude)
+            compassStr = h.compassDirection
+        }
     }
 }
