@@ -10,6 +10,7 @@ struct SettingsView: View {
     @Environment(AppState.self) private var appState
     @State private var manualLatitude = ""
     @State private var manualLongitude = ""
+    @State private var locationError = false
 
     var body: some View {
         @Bindable var appState = appState
@@ -57,10 +58,24 @@ struct SettingsView: View {
                     Toggle("Starlink constellation", isOn: $appState.showStarlink)
                         .disabled(!appState.showSatellites)
                     Toggle("Notify me before passes", isOn: passNotificationBinding)
+                    Toggle("Notify me before sky events", isOn: eventNotificationBinding)
                 } header: {
                     Text("Satellites")
                 } footer: {
-                    Text("Shows the ISS, Hubble and other naked-eye satellites. The Starlink option adds up to 300 Starlink satellites from live Celestrak data. Star a satellite in the Catalog to get a heads-up 10 minutes before its visible passes.")
+                    Text("Shows the ISS, Hubble and other naked-eye satellites. The Starlink option adds up to 300 Starlink satellites from live Celestrak data. Star a satellite in the Catalog to get a heads-up 10 minutes before its visible passes. Sky-event alerts fire the evening before conjunctions, eclipses, meteor shower peaks, and moon phases.")
+                }
+
+                Section {
+                    Picker("Sky view mode", selection: $appState.skyDisplayMode) {
+                        Text("AR camera").tag(SkyDisplayMode.ar)
+                        Text("Immersive (no camera)").tag(SkyDisplayMode.vr)
+                        Text("Free-look (drag)").tag(SkyDisplayMode.freeLook)
+                    }
+                    .pickerStyle(.menu)
+                } header: {
+                    Text("Sky view")
+                } footer: {
+                    Text("AR uses the camera for a real-world overlay. Immersive shows a pure black sky driven by the gyroscope. Free-look lets you drag to look around.")
                 }
 
                 Section {
@@ -100,10 +115,14 @@ struct SettingsView: View {
                                    value: "\(appState.satelliteService.satellites.count)")
                     LabeledContent("Ephemeris", value: "Meeus / JPL approximations")
                     LabeledContent("Satellite propagator", value: "SGP4 (Vallado)")
+                    Button("Replay intro") {
+                        appState.hasOnboarded = false
+                    }
+                    .foregroundStyle(.indigo)
                 } header: {
                     Text("About")
                 } footer: {
-                    Text("Star data: Yale Bright Star Catalogue and the HYG database (CC BY-SA 4.0). Deep-sky: Messier, Caldwell & NGC. Ephemerides: Meeus / JPL. Satellite elements: Celestrak. Planet textures: Solar System Scope (CC BY 4.0).")
+                    Text("Star data: Yale Bright Star Catalogue and the HYG database (CC BY-SA 4.0). Deep-sky: Messier, Caldwell & NGC. Ephemerides: Meeus / JPL. Satellite elements: Celestrak. Planet textures: Solar System Scope (CC BY 4.0). Messier photos: NASA/ESA Hubble; other deep-sky & star photos: Wikimedia Commons.")
                 }
             }
             .navigationTitle("Settings")
@@ -119,6 +138,20 @@ struct SettingsView: View {
                 Task {
                     if newValue { _ = await appState.notificationScheduler.requestAuthorization() }
                     await appState.refreshPassNotifications()
+                }
+            }
+        )
+    }
+
+    /// Enabling requests notification authorization, then (re)schedules sky-event alerts.
+    private var eventNotificationBinding: Binding<Bool> {
+        Binding(
+            get: { appState.eventNotificationsEnabled },
+            set: { newValue in
+                appState.eventNotificationsEnabled = newValue
+                Task {
+                    if newValue { _ = await appState.eventNotificationScheduler.requestAuthorization() }
+                    await appState.refreshEventNotifications()
                 }
             }
         )
@@ -152,13 +185,23 @@ struct SettingsView: View {
                 Button("Set") {
                     if let lat = Double(manualLatitude), let lon = Double(manualLongitude),
                        abs(lat) <= 90, abs(lon) <= 180 {
+                        locationError = false
                         appState.locationService.setManualLocation(latitudeDegrees: lat,
                                                                    longitudeDegrees: lon)
+                        manualLatitude = ""
+                        manualLongitude = ""
+                    } else {
+                        locationError = true
                     }
                 }
                 .disabled(Double(manualLatitude) == nil || Double(manualLongitude) == nil)
             }
             .font(.subheadline)
+            if locationError {
+                Text("Enter a valid latitude (−90 to 90) and longitude (−180 to 180).")
+                    .font(.caption)
+                    .foregroundStyle(.red)
+            }
         } header: {
             Text("Location")
         } footer: {

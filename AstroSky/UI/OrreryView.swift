@@ -12,12 +12,16 @@ import SwiftUI
 
 struct OrreryView: View {
     @Environment(AppState.self) private var appState
+    /// Bumped once after the view is on screen to force RealityKit to draw its
+    /// first frame — a `.nonAR` ARView otherwise stays black until interacted with.
+    @State private var renderTick = 0
 
     var body: some View {
         @Bindable var appState = appState
         ZStack(alignment: .bottom) {
-            OrrerySceneView(julianDate: appState.skyJulianDate)
+            OrrerySceneView(julianDate: appState.skyJulianDate, renderTick: renderTick)
                 .ignoresSafeArea()
+                .task { renderTick += 1 }
 
             VStack(spacing: 8) {
                 if !appState.isLiveTime {
@@ -44,6 +48,9 @@ struct OrreryView: View {
 
 private struct OrrerySceneView: UIViewRepresentable {
     let julianDate: Double
+    /// Change-only trigger: a new value forces `updateUIView`, which reassigns
+    /// entity transforms and thereby dirties the scene so it renders.
+    let renderTick: Int
 
     func makeCoordinator() -> OrreryScene { OrreryScene() }
 
@@ -81,7 +88,7 @@ final class OrreryScene: NSObject {
         root.addChild(sun)
 
         // Orbit rings + planet markers.
-        for planet in Planet.allCases where planet != .earth || true {
+        for planet in Planet.allCases where planet != .earth {
             let a = semiMajorAU(planet)
             root.addChild(makeOrbitRing(radius: sceneRadius(au: a)))
             let marker = ModelEntity(mesh: .generateSphere(radius: markerRadius(planet)),

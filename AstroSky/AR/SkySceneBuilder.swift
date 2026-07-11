@@ -20,6 +20,7 @@ import RealityKit
 import UIKit
 import simd
 
+@MainActor
 enum SkySceneBuilder {
     /// Radius of the celestial sphere in scene meters. Far enough that
     /// parallax from walking around is negligible, near enough to avoid
@@ -113,18 +114,18 @@ enum SkySceneBuilder {
             let center = CGPoint(x: dimension / 2, y: dimension / 2)
             let maxRadius = CGFloat(dimension) / 2
             let space = CGColorSpaceCreateDeviceRGB()
-            let glow = CGGradient(colorsSpace: space,
-                                  colors: [UIColor(white: 1, alpha: 1).cgColor,
-                                           UIColor(white: 1, alpha: 0).cgColor] as CFArray,
-                                  locations: [0, 1])!
+            guard let glow = CGGradient(colorsSpace: space,
+                                        colors: [UIColor(white: 1, alpha: 1).cgColor,
+                                                 UIColor(white: 1, alpha: 0).cgColor] as CFArray,
+                                        locations: [0, 1]) else { return }
             cg.drawRadialGradient(glow, startCenter: center, startRadius: 0,
                                   endCenter: center, endRadius: maxRadius * 0.95, options: [])
             if spikes {
                 cg.setBlendMode(.plusLighter)
-                let spike = CGGradient(colorsSpace: space,
-                                       colors: [UIColor(white: 1, alpha: 0.85).cgColor,
-                                                UIColor(white: 1, alpha: 0).cgColor] as CFArray,
-                                       locations: [0, 1])!
+                guard let spike = CGGradient(colorsSpace: space,
+                                             colors: [UIColor(white: 1, alpha: 0.85).cgColor,
+                                                      UIColor(white: 1, alpha: 0).cgColor] as CFArray,
+                                             locations: [0, 1]) else { return }
                 for angle in [0.0, Double.pi / 2] {
                     cg.saveGState()
                     cg.translateBy(x: center.x, y: center.y)
@@ -151,9 +152,11 @@ enum SkySceneBuilder {
     }
 
     /// Apparent quad half-size in meters for a magnitude, at sphereRadius.
+    /// A steep falloff gives a strong, pro-app contrast between the few bright
+    /// stars (large, glinting) and the faint background stars (small dots).
     static func starSize(magnitude: Double) -> Float {
-        let size = 0.95 * pow(0.80, magnitude)
-        return Float(min(1.8, max(0.16, size)))
+        let size = 1.2 * pow(0.72, magnitude)
+        return Float(min(2.8, max(0.12, size)))
     }
 
     /// Build the batched star-field entity: one textured child per color
@@ -175,10 +178,10 @@ enum SkySceneBuilder {
             let bucket = colorBucket(forColorIndex: star.colorIndex)
             let direction = equatorialVector(star.equatorialJ2000)
             let center = direction * sphereRadius
-            let bright = star.visualMagnitude < 0.5
-            // Sprites carry a transparent margin, so enlarge the quad a touch
-            // (more for the spiked brightest stars) to keep the disk sized.
-            let half = starSize(magnitude: star.visualMagnitude) * (bright ? 2.2 : 1.4)
+            // The brightest ~2 dozen stars get diffraction spikes + extra size
+            // so they read as the recognizable bright stars of the sky.
+            let bright = star.visualMagnitude < 1.5
+            let half = starSize(magnitude: star.visualMagnitude) * (bright ? 2.3 : 1.4)
             if bright {
                 appendQuad(center: center, radialDirection: direction, halfSize: half,
                            vertices: &spikeV[bucket], indices: &spikeI[bucket], uvs: &spikeUV[bucket])
@@ -298,13 +301,13 @@ enum SkySceneBuilder {
         let image = renderer.image { context in
             let space = CGColorSpaceCreateDeviceRGB()
             let tint = UIColor(red: 0.72, green: 0.78, blue: 0.95, alpha: 1)
-            let gradient = CGGradient(colorsSpace: space,
-                                      colors: [tint.withAlphaComponent(0.0).cgColor,
-                                               tint.withAlphaComponent(0.10).cgColor,
-                                               tint.withAlphaComponent(0.28).cgColor,
-                                               tint.withAlphaComponent(0.10).cgColor,
-                                               tint.withAlphaComponent(0.0).cgColor] as CFArray,
-                                      locations: [0, 0.32, 0.5, 0.68, 1])!
+            guard let gradient = CGGradient(colorsSpace: space,
+                                            colors: [tint.withAlphaComponent(0.0).cgColor,
+                                                     tint.withAlphaComponent(0.10).cgColor,
+                                                     tint.withAlphaComponent(0.28).cgColor,
+                                                     tint.withAlphaComponent(0.10).cgColor,
+                                                     tint.withAlphaComponent(0.0).cgColor] as CFArray,
+                                            locations: [0, 0.32, 0.5, 0.68, 1]) else { return }
             context.cgContext.drawLinearGradient(gradient,
                                                  start: CGPoint(x: 0, y: 0),
                                                  end: CGPoint(x: 0, y: height),
@@ -528,6 +531,20 @@ enum SkySceneBuilder {
         }
     }
 
+    /// Bundled 2K texture file key for each planet's Sky-view marker.
+    static func planetTextureKey(_ planet: Planet) -> String {
+        switch planet {
+        case .mercury: "2k_mercury"
+        case .venus: "2k_venus_atmosphere"
+        case .earth: "2k_earth_daymap"
+        case .mars: "2k_mars"
+        case .jupiter: "2k_jupiter"
+        case .saturn: "2k_saturn"
+        case .uranus: "2k_uranus"
+        case .neptune: "2k_neptune"
+        }
+    }
+
     static func planetMarkerRadius(_ planet: Planet) -> Float {
         switch planet {
         case .venus, .jupiter: 1.15
@@ -546,11 +563,20 @@ enum SkySceneBuilder {
         root.name = "solarSystem"
         var markers: [String: Entity] = [:]
 
-        func addMarker(id: String, labelText: String, color: UIColor, radius: Float) {
+        func addMarker(id: String, labelText: String, color: UIColor, radius: Float, textureKey: String? = nil) {
             let holder = Entity()
             holder.name = id
-            let sphere = ModelEntity(mesh: .generateSphere(radius: radius),
-                                     materials: [UnlitMaterial(color: color)])
+            let material: Material
+            if let textureKey, let texture = ScaleModelTexture.texture(key: textureKey) {
+                var textured = UnlitMaterial(color: .white)
+                textured.color = .init(tint: .white, texture: .init(texture))
+                material = textured
+            } else {
+                material = UnlitMaterial(color: color)
+            }
+            let sphere = ModelEntity(mesh: .generateSphere(radius: radius), materials: [material])
+            // Show the map the right way up and turned toward the viewer.
+            sphere.orientation = simd_quatf(angle: .pi / 2, axis: SIMD3(1, 0, 0))
             holder.addChild(sphere)
             let label = makeLabel(text: labelText, color: color, size: 1.7)
             label.position = SIMD3(0, -radius - 1.7, 0)
@@ -560,16 +586,18 @@ enum SkySceneBuilder {
         }
 
         addMarker(id: "sun", labelText: "Sun",
-                  color: UIColor(red: 1.0, green: 0.93, blue: 0.55, alpha: 1), radius: 2.3)
+                  color: UIColor(red: 1.0, green: 0.93, blue: 0.55, alpha: 1), radius: 2.6, textureKey: "2k_sun")
         addMarker(id: "moon", labelText: "Moon",
-                  color: UIColor(white: 0.92, alpha: 1), radius: 2.1)
+                  color: UIColor(white: 0.92, alpha: 1), radius: 2.4, textureKey: "2k_moon")
         for planet in Planet.visible {
+            // Oversized so planets are easy to find in the sky.
             addMarker(id: "planet.\(planet.rawValue)", labelText: planet.name,
-                      color: planetColor(planet), radius: planetMarkerRadius(planet))
+                      color: planetColor(planet), radius: planetMarkerRadius(planet) * 2.4,
+                      textureKey: planetTextureKey(planet))
         }
         for body in MinorBodyEphemeris.bodies {
             addMarker(id: "minor.\(body.key)", labelText: body.name,
-                      color: UIColor(white: 0.78, alpha: 1), radius: 0.6)
+                      color: UIColor(white: 0.78, alpha: 1), radius: 0.9)
         }
         return (root, markers)
     }
@@ -623,11 +651,11 @@ enum SkySceneBuilder {
         let image = renderer.image { context in
             let space = CGColorSpaceCreateDeviceRGB()
             let tint = UIColor(red: 0.55, green: 0.45, blue: 0.34, alpha: 1)   // sodium-glow warm
-            let gradient = CGGradient(colorsSpace: space,
-                                      colors: [tint.withAlphaComponent(0.0).cgColor,
-                                               tint.withAlphaComponent(0.12).cgColor,
-                                               tint.withAlphaComponent(0.6).cgColor] as CFArray,
-                                      locations: [0, 0.55, 1])!
+            guard let gradient = CGGradient(colorsSpace: space,
+                                            colors: [tint.withAlphaComponent(0.0).cgColor,
+                                                     tint.withAlphaComponent(0.12).cgColor,
+                                                     tint.withAlphaComponent(0.6).cgColor] as CFArray,
+                                            locations: [0, 0.55, 1]) else { return }
             // v=0 (top, faint) → v=1 (bottom, near horizon, strong).
             context.cgContext.drawLinearGradient(gradient,
                                                  start: CGPoint(x: 0, y: 0),
@@ -869,6 +897,7 @@ enum SkySceneBuilder {
             appendSegment(from: p0, to: p1, width: width, vertices: &vertices, indices: &indices)
         }
     }
+
 
     // MARK: Labels
 

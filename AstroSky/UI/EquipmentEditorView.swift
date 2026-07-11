@@ -83,7 +83,7 @@ struct EquipmentEditorView: View {
                     HStack {
                         VStack(alignment: .leading) {
                             Text(eyepiece.name).foregroundStyle(.primary)
-                            Text("\(Int(eyepiece.focalLengthMM))mm · \(Int(eyepiece.apparentFOVDegrees))° AFOV")
+                            Text("\(eyepiece.focalLengthMM.formatted(.number.precision(.fractionLength(0...1))))mm · \(Int(eyepiece.apparentFOVDegrees))° AFOV")
                                 .font(.caption).foregroundStyle(.secondary)
                         }
                         Spacer()
@@ -122,8 +122,8 @@ private struct AddTelescopeSheet: View {
                     ForEach(EquipmentHelp.telescopePresets) { preset in
                         Button(preset.name) {
                             name = preset.name
-                            focal = String(Int(preset.focalLengthMM))
-                            aperture = String(Int(preset.apertureMM))
+                            focal = preset.focalLengthMM.formatted(.number.grouping(.never).precision(.fractionLength(0...2)))
+                            aperture = preset.apertureMM.formatted(.number.grouping(.never).precision(.fractionLength(0...2)))
                         }
                     }
                 }
@@ -131,10 +131,10 @@ private struct AddTelescopeSheet: View {
                     TextField("Name (e.g. My Dobsonian)", text: $name)
                 } header: { Text("Name") }
                 Section {
-                    TextField("Focal length (mm)", text: $focal).keyboardType(.numberPad)
+                    TextField("Focal length (mm)", text: $focal).keyboardType(.decimalPad)
                 } footer: { Text(EquipmentHelp.scopeFocalLength) }
                 Section {
-                    TextField("Aperture (mm)", text: $aperture).keyboardType(.numberPad)
+                    TextField("Aperture (mm)", text: $aperture).keyboardType(.decimalPad)
                 } footer: { Text(EquipmentHelp.aperture) }
             }
             .navigationTitle("Add Telescope")
@@ -180,8 +180,8 @@ private struct AddEyepieceSheet: View {
                     ForEach(EquipmentHelp.eyepiecePresets) { preset in
                         Button(preset.name) {
                             name = preset.name
-                            focal = String(Int(preset.focalLengthMM))
-                            afov = String(Int(preset.apparentFOVDegrees))
+                            focal = preset.focalLengthMM.formatted(.number.grouping(.never).precision(.fractionLength(0...2)))
+                            afov = preset.apparentFOVDegrees.formatted(.number.grouping(.never).precision(.fractionLength(0...1)))
                         }
                     }
                 }
@@ -189,10 +189,10 @@ private struct AddEyepieceSheet: View {
                     TextField("Name (e.g. 25mm Plössl)", text: $name)
                 } header: { Text("Name") }
                 Section {
-                    TextField("Focal length (mm)", text: $focal).keyboardType(.numberPad)
+                    TextField("Focal length (mm)", text: $focal).keyboardType(.decimalPad)
                 } footer: { Text(EquipmentHelp.eyepieceFocalLength) }
                 Section {
-                    TextField("Apparent field of view (°)", text: $afov).keyboardType(.numberPad)
+                    TextField("Apparent field of view (°)", text: $afov).keyboardType(.decimalPad)
                 } footer: { Text(EquipmentHelp.apparentFOV) }
                 if let previewLine {
                     Section { Text(previewLine).font(.footnote).foregroundStyle(.secondary) }

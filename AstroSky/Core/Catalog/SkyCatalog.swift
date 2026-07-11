@@ -23,13 +23,26 @@ struct SkyCatalog {
     let deepSky = SkyCatalog.allDeepSky
     let constellations = ConstellationCatalog.constellations
 
+    let allObjects: [any CelestialObject]
+    private let objectIndex: [String: any CelestialObject]
+
     /// Every deep-sky object across all bundled catalogs (Messier + Caldwell +
     /// famous NGC), used for markers, search and the catalog list.
     static let allDeepSky: [DeepSkyObject] =
         MessierCatalog.objects + CaldwellCatalog.objects + NGCHighlights.objects
 
-    init() {
-        if let deep = HYGCatalogLoader.loadIfAvailable() {
+    /// Sun, Moon, planets, and minor bodies in presentation order.
+    var solarSystemObjects: [any CelestialObject] {
+        var objects: [any CelestialObject] = [sun, moon]
+        objects.append(contentsOf: planets.map { $0 as any CelestialObject })
+        objects.append(contentsOf: minorBodies.map { $0 as any CelestialObject })
+        return objects
+    }
+
+    /// Fast synchronous init. Pass pre-loaded HYG stars to upgrade to the deep
+    /// catalog; omit (or pass nil) to use the embedded bright-star list only.
+    init(deepStars: [Star]? = nil) {
+        if let deep = deepStars {
             // Keep the curated bright stars (they carry the keys used by
             // constellation figures) and add HYG stars below the embedded
             // catalog's magnitude floor.
@@ -42,16 +55,21 @@ struct SkyCatalog {
             self.stars = StarCatalog.stars
             self.usesDeepCatalog = false
         }
-    }
 
-    /// All searchable objects (excluding satellites, which AppState adds).
-    var allObjects: [any CelestialObject] {
+        // Build allObjects from all sources
         var objects: [any CelestialObject] = [sun, moon]
         objects.append(contentsOf: planets.map { $0 as any CelestialObject })
         objects.append(contentsOf: minorBodies.map { $0 as any CelestialObject })
-        objects.append(contentsOf: StarCatalog.stars.map { $0 as any CelestialObject })
+        objects.append(contentsOf: self.stars.map { $0 as any CelestialObject })
         objects.append(contentsOf: deepSky.map { $0 as any CelestialObject })
-        return objects
+        self.allObjects = objects
+
+        // Build objectIndex for fast lookup
+        var index: [String: any CelestialObject] = [:]
+        for object in self.allObjects {
+            index[object.id] = object
+        }
+        self.objectIndex = index
     }
 
     /// Case/diacritic-insensitive search over names, designations and types.
@@ -86,7 +104,7 @@ struct SkyCatalog {
 
     /// Find an object by its stable identifier.
     func object(withID id: String) -> (any CelestialObject)? {
-        allObjects.first { $0.id == id }
+        objectIndex[id]
     }
 
     /// The brightest stars currently above `altitudeDegrees` (stars are stored

@@ -9,6 +9,9 @@
 
 import Foundation
 import Observation
+import OSLog
+
+private let logger = Logger(subsystem: "com.astrosky", category: "network")
 
 @MainActor
 @Observable
@@ -29,6 +32,7 @@ final class SatelliteService {
 
     private(set) var satellites: [Satellite] = []
     private(set) var state: FetchState = .idle
+    private var _starlinkForDisplay: [Satellite] = []
 
     /// Satellites of the bright/featured kind (non-Starlink).
     var featured: [Satellite] { satellites.filter { !$0.isStarlink } }
@@ -38,7 +42,7 @@ final class SatelliteService {
     /// would clutter the sky and burn CPU. The subset is stable (sorted by
     /// catalog number).
     var starlinkForDisplay: [Satellite] {
-        Array(starlink.sorted { $0.tle.catalogNumber < $1.tle.catalogNumber }.prefix(300))
+        _starlinkForDisplay
     }
 
     func satellite(withID id: String) -> Satellite? {
@@ -76,15 +80,20 @@ final class SatelliteService {
         await withTaskGroup(of: (String, String?).self) { taskGroup in
             for group in Self.groups {
                 taskGroup.addTask {
-                    let text = try? await Self.fetchGroup(group)
-                    return (group, text)
+                    do {
+                        let text = try await Self.fetchGroup(group)
+                        return (group, text)
+                    } catch {
+                        logger.error("TLE fetch failed for group '\(group, privacy: .public)': \(error.localizedDescription, privacy: .public)")
+                        return (group, nil)
+                    }
                 }
             }
             for await (group, text) in taskGroup {
                 if let text {
                     fetched[group] = text
                 } else if firstError == nil {
-                    firstError = "Couldn't reach Celestrak for “\(group)”"
+                    firstError = "Couldn't reach Celestrak for \"\(group)\""
                 }
             }
         }
@@ -115,6 +124,7 @@ final class SatelliteService {
             }
         }
         satellites = result
+        _starlinkForDisplay = Array(satellites.filter(\.isStarlink).sorted { $0.tle.catalogNumber < $1.tle.catalogNumber }.prefix(300))
     }
 
     private static func fetchGroup(_ group: String) async throws -> String {
@@ -168,17 +178,23 @@ final class SatelliteService {
     }
 
     private func loadFromCache() -> (date: Date, sets: [String: String])? {
-        guard let data = try? Data(contentsOf: Self.cacheURL),
-              let payload = try? JSONDecoder().decode(CachePayload.self, from: data) else {
+        do {
+            let data = try Data(contentsOf: Self.cacheURL)
+            let payload = try JSONDecoder().decode(CachePayload.self, from: data)
+            return (payload.date, payload.sets)
+        } catch {
+            logger.debug("Failed to load TLE cache: \(error.localizedDescription, privacy: .public)")
             return nil
         }
-        return (payload.date, payload.sets)
     }
 
     private func saveToCache(sets: [String: String]) {
         let payload = CachePayload(date: Date(), sets: sets)
-        if let data = try? JSONEncoder().encode(payload) {
-            try? data.write(to: Self.cacheURL, options: .atomic)
+        do {
+            let data = try JSONEncoder().encode(payload)
+            try data.write(to: Self.cacheURL, options: .atomic)
+        } catch {
+            logger.error("Failed to save TLE cache: \(error.localizedDescription, privacy: .public)")
         }
     }
 

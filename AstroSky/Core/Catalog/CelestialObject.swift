@@ -42,7 +42,7 @@ struct SkyPosition {
     var distanceDescription: String?
 }
 
-protocol CelestialObject {
+protocol CelestialObject: Sendable {
     /// Stable unique identifier, e.g. "star.sirius", "planet.mars", "m031".
     var id: String { get }
     var name: String { get }

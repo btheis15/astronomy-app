@@ -11,6 +11,7 @@ import RealityKit
 import UIKit
 import simd
 
+@MainActor
 enum ScaleModelBuilder {
     /// Radius the primary body is drawn at (meters) — a ~30 cm model.
     static let primaryTargetMeters = 0.15

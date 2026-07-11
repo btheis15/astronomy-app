@@ -1,0 +1,75 @@
+{
+  "sourceLanguage" : "en",
+  "strings" : {
+    "Is a planet visible tonight in ${applicationName}" : {
+      "extractionState" : "extracted_with_value",
+      "localizations" : {
+        "en" : {
+          "stringSet" : {
+            "state" : "new",
+            "values" : [
+              "Is a planet visible tonight in ${applicationName}",
+              "${applicationName} planet visibility"
+            ]
+          }
+        },
+        "es" : {
+          "stringSet" : {
+            "state" : "machine_translated",
+            "values" : [
+              "¿Hay algún planeta visible esta noche en ${applicationName}",
+              "Visibilidad de planetas en ${applicationName}"
+            ]
+          }
+        }
+      }
+    },
+    "What's the moon phase in ${applicationName}" : {
+      "extractionState" : "extracted_with_value",
+      "localizations" : {
+        "en" : {
+          "stringSet" : {
+            "state" : "new",
+            "values" : [
+              "What's the moon phase in ${applicationName}",
+              "${applicationName} moon phase"
+            ]
+          }
+        },
+        "es" : {
+          "stringSet" : {
+            "state" : "machine_translated",
+            "values" : [
+              "Qué fase de la Luna hay en ${applicationName}",
+              "Fase de la Luna en ${applicationName}"
+            ]
+          }
+        }
+      }
+    },
+    "When is the next ISS pass in ${applicationName}" : {
+      "extractionState" : "extracted_with_value",
+      "localizations" : {
+        "en" : {
+          "stringSet" : {
+            "state" : "new",
+            "values" : [
+              "When is the next ISS pass in ${applicationName}",
+              "${applicationName} next space station pass"
+            ]
+          }
+        },
+        "es" : {
+          "stringSet" : {
+            "state" : "machine_translated",
+            "values" : [
+              "Cuándo es el próximo paso de la ISS en ${applicationName}",
+              "Próximo paso de la estación espacial en ${applicationName}"
+            ]
+          }
+        }
+      }
+    }
+  },
+  "version" : "1.3"
+}

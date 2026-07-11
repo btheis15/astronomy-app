@@ -10,17 +10,140 @@ import Foundation
 import Observation
 import SwiftUI
 
+enum SkyDisplayMode: Int, Hashable {
+    case ar = 0       // camera passthrough + ARKit motion tracking
+    case vr = 1       // black background + gyroscope motion tracking
+    case freeLook = 2 // black background + drag to look
+}
+
 @MainActor
 @Observable
 final class AppState {
     // MARK: Services & data
 
-    let catalog = SkyCatalog()
+    var catalog = SkyCatalog()   // starts with embedded bright stars; upgraded async in start()
     let satelliteService = SatelliteService()
     let locationService = LocationService()
     let notificationScheduler = PassNotificationScheduler()
+    let eventNotificationScheduler = EventNotificationScheduler()
+    private var _equipment: EquipmentLibrary?
+    private var _favoriteObjectIDs: Set<String> = []
+    private var _favoriteSatelliteIDs: Set<String> = []
 
     var observer: Observer { locationService.observer }
+
+    // MARK: Persisted display settings (loaded in init)
+
+    var showConstellationLines: Bool = true {
+        didSet { UserDefaults.standard.set(showConstellationLines, forKey: "showConstellationLines") }
+    }
+
+    var showLabels: Bool = true {
+        didSet { UserDefaults.standard.set(showLabels, forKey: "showLabels") }
+    }
+
+    var showSatellites: Bool = true {
+        didSet { UserDefaults.standard.set(showSatellites, forKey: "showSatellites") }
+    }
+
+    var showStarlink: Bool = false {
+        didSet { UserDefaults.standard.set(showStarlink, forKey: "showStarlink") }
+    }
+
+    var showDeepSky: Bool = true {
+        didSet { UserDefaults.standard.set(showDeepSky, forKey: "showDeepSky") }
+    }
+
+    var nightMode: Bool = false {
+        didSet { UserDefaults.standard.set(nightMode, forKey: "nightMode") }
+    }
+
+    var skyDisplayMode: SkyDisplayMode = .ar {
+        didSet { UserDefaults.standard.set(skyDisplayMode.rawValue, forKey: "skyDisplayMode") }
+    }
+
+    var showMeteorShowers: Bool = true {
+        didSet { UserDefaults.standard.set(showMeteorShowers, forKey: "showMeteorShowers") }
+    }
+
+    var showMilkyWay: Bool = true {
+        didSet { UserDefaults.standard.set(showMilkyWay, forKey: "showMilkyWay") }
+    }
+
+    var showEcliptic: Bool = false {
+        didSet { UserDefaults.standard.set(showEcliptic, forKey: "showEcliptic") }
+    }
+
+    var showCelestialEquator: Bool = false {
+        didSet { UserDefaults.standard.set(showCelestialEquator, forKey: "showCelestialEquator") }
+    }
+
+    var showCoordinateGrid: Bool = false {
+        didSet { UserDefaults.standard.set(showCoordinateGrid, forKey: "showCoordinateGrid") }
+    }
+
+    var hasOnboarded: Bool = false {
+        didSet { UserDefaults.standard.set(hasOnboarded, forKey: "hasOnboarded") }
+    }
+
+    var bortleClass: Int = 4 {
+        didSet {
+            let clamped = min(9, max(1, bortleClass))
+            guard clamped == bortleClass else {
+                bortleClass = clamped   // re-fires didSet with the valid value, which writes UserDefaults
+                return
+            }
+            UserDefaults.standard.set(bortleClass, forKey: "bortleClass")
+        }
+    }
+
+    var magnitudeLimit: Double = 5.5 {
+        didSet { UserDefaults.standard.set(magnitudeLimit, forKey: "magnitudeLimit") }
+    }
+
+    var passNotificationsEnabled: Bool = false {
+        didSet { UserDefaults.standard.set(passNotificationsEnabled, forKey: "passNotificationsEnabled") }
+    }
+
+    var eventNotificationsEnabled: Bool = false {
+        didSet { UserDefaults.standard.set(eventNotificationsEnabled, forKey: "eventNotificationsEnabled") }
+    }
+
+    init() {
+        let ud = UserDefaults.standard
+
+        // Load bool settings with proper nil checking
+        showConstellationLines = ud.object(forKey: "showConstellationLines") == nil ? true : ud.bool(forKey: "showConstellationLines")
+        showLabels = ud.object(forKey: "showLabels") == nil ? true : ud.bool(forKey: "showLabels")
+        showSatellites = ud.object(forKey: "showSatellites") == nil ? true : ud.bool(forKey: "showSatellites")
+        showStarlink = ud.object(forKey: "showStarlink") == nil ? false : ud.bool(forKey: "showStarlink")
+        showDeepSky = ud.object(forKey: "showDeepSky") == nil ? true : ud.bool(forKey: "showDeepSky")
+        nightMode = ud.object(forKey: "nightMode") == nil ? false : ud.bool(forKey: "nightMode")
+        // Migrate from old preferManualSky bool if skyDisplayMode not yet stored.
+        if ud.object(forKey: "skyDisplayMode") != nil {
+            skyDisplayMode = SkyDisplayMode(rawValue: ud.integer(forKey: "skyDisplayMode")) ?? .ar
+        } else {
+            skyDisplayMode = ud.bool(forKey: "preferManualSky") ? .freeLook : .ar
+        }
+        showMeteorShowers = ud.object(forKey: "showMeteorShowers") == nil ? true : ud.bool(forKey: "showMeteorShowers")
+        showMilkyWay = ud.object(forKey: "showMilkyWay") == nil ? true : ud.bool(forKey: "showMilkyWay")
+        showEcliptic = ud.object(forKey: "showEcliptic") == nil ? false : ud.bool(forKey: "showEcliptic")
+        showCelestialEquator = ud.object(forKey: "showCelestialEquator") == nil ? false : ud.bool(forKey: "showCelestialEquator")
+        showCoordinateGrid = ud.object(forKey: "showCoordinateGrid") == nil ? false : ud.bool(forKey: "showCoordinateGrid")
+        hasOnboarded = ud.object(forKey: "hasOnboarded") == nil ? false : ud.bool(forKey: "hasOnboarded")
+        passNotificationsEnabled = ud.object(forKey: "passNotificationsEnabled") == nil ? false : ud.bool(forKey: "passNotificationsEnabled")
+        eventNotificationsEnabled = ud.object(forKey: "eventNotificationsEnabled") == nil ? false : ud.bool(forKey: "eventNotificationsEnabled")
+        skyAlignmentOffset = Float(ud.double(forKey: "skyAlignmentOffset"))
+        _favoriteObjectIDs = Set(ud.stringArray(forKey: "favoriteObjectIDs") ?? [])
+        _favoriteSatelliteIDs = Set(ud.stringArray(forKey: "favoriteSatelliteIDs") ?? [])
+
+        // Load integer and double settings with zero-check for defaults
+        let storedBortle = ud.integer(forKey: "bortleClass")
+        bortleClass = storedBortle == 0 ? 4 : min(9, max(1, storedBortle))
+
+        let storedMag = ud.double(forKey: "magnitudeLimit")
+        magnitudeLimit = storedMag == 0 ? 5.5 : storedMag
+    }
 
     // MARK: Time travel
 
@@ -39,14 +162,18 @@ final class AppState {
     var equipment: EquipmentLibrary {
         get {
             access(keyPath: \.equipment)
+            if let cached = _equipment { return cached }
             guard let data = UserDefaults.standard.data(forKey: "equipmentLibrary"),
                   let library = try? JSONDecoder().decode(EquipmentLibrary.self, from: data) else {
+                _equipment = .empty
                 return .empty
             }
+            _equipment = library
             return library
         }
         set {
             withMutation(keyPath: \.equipment) {
+                _equipment = newValue
                 if let data = try? JSONEncoder().encode(newValue) {
                     UserDefaults.standard.set(data, forKey: "equipmentLibrary")
                 }
@@ -94,10 +221,11 @@ final class AppState {
     var favoriteObjectIDs: Set<String> {
         get {
             access(keyPath: \.favoriteObjectIDs)
-            return Set(UserDefaults.standard.stringArray(forKey: "favoriteObjectIDs") ?? [])
+            return _favoriteObjectIDs
         }
         set {
             withMutation(keyPath: \.favoriteObjectIDs) {
+                _favoriteObjectIDs = newValue
                 UserDefaults.standard.set(Array(newValue), forKey: "favoriteObjectIDs")
             }
         }
@@ -115,14 +243,6 @@ final class AppState {
         favoriteObjectIDs.sorted().compactMap { object(withID: $0) }
     }
 
-    // MARK: Onboarding
-
-    /// True once the first-launch onboarding flow has been completed or skipped.
-    var hasOnboarded: Bool {
-        get { access(keyPath: \.hasOnboarded); return defaults(bool: "hasOnboarded", default: false) }
-        set { withMutation(keyPath: \.hasOnboarded) { UserDefaults.standard.set(newValue, forKey: "hasOnboarded") } }
-    }
-
     // MARK: Selection & navigation
 
     /// Object currently shown in the info card / detail sheet.
@@ -135,7 +255,9 @@ final class AppState {
     /// Manual fine-alignment of the AR sky overlay about the zenith axis,
     /// in radians. Set by a two-finger horizontal drag in AR mode; lives here
     /// so it survives tab switches and AR-view rebuilds.
-    var skyAlignmentOffset: Float = 0
+    var skyAlignmentOffset: Float = 0 {
+        didSet { UserDefaults.standard.set(Double(skyAlignmentOffset), forKey: "skyAlignmentOffset") }
+    }
     var hasAlignmentOffset: Bool { abs(skyAlignmentOffset) > 0.0001 }
     func resetAlignment() { skyAlignmentOffset = 0 }
 
@@ -166,75 +288,6 @@ final class AppState {
         return results
     }
 
-    // MARK: Display settings (persisted)
-
-    var showConstellationLines: Bool {
-        get { access(keyPath: \.showConstellationLines); return defaults(bool: "showConstellationLines", default: true) }
-        set { withMutation(keyPath: \.showConstellationLines) { UserDefaults.standard.set(newValue, forKey: "showConstellationLines") } }
-    }
-
-    var showLabels: Bool {
-        get { access(keyPath: \.showLabels); return defaults(bool: "showLabels", default: true) }
-        set { withMutation(keyPath: \.showLabels) { UserDefaults.standard.set(newValue, forKey: "showLabels") } }
-    }
-
-    var showSatellites: Bool {
-        get { access(keyPath: \.showSatellites); return defaults(bool: "showSatellites", default: true) }
-        set { withMutation(keyPath: \.showSatellites) { UserDefaults.standard.set(newValue, forKey: "showSatellites") } }
-    }
-
-    var showStarlink: Bool {
-        get { access(keyPath: \.showStarlink); return defaults(bool: "showStarlink", default: false) }
-        set { withMutation(keyPath: \.showStarlink) { UserDefaults.standard.set(newValue, forKey: "showStarlink") } }
-    }
-
-    var showDeepSky: Bool {
-        get { access(keyPath: \.showDeepSky); return defaults(bool: "showDeepSky", default: true) }
-        set { withMutation(keyPath: \.showDeepSky) { UserDefaults.standard.set(newValue, forKey: "showDeepSky") } }
-    }
-
-    var nightMode: Bool {
-        get { access(keyPath: \.nightMode); return defaults(bool: "nightMode", default: false) }
-        set { withMutation(keyPath: \.nightMode) { UserDefaults.standard.set(newValue, forKey: "nightMode") } }
-    }
-
-    var showMeteorShowers: Bool {
-        get { access(keyPath: \.showMeteorShowers); return defaults(bool: "showMeteorShowers", default: true) }
-        set { withMutation(keyPath: \.showMeteorShowers) { UserDefaults.standard.set(newValue, forKey: "showMeteorShowers") } }
-    }
-
-    var showMilkyWay: Bool {
-        get { access(keyPath: \.showMilkyWay); return defaults(bool: "showMilkyWay", default: true) }
-        set { withMutation(keyPath: \.showMilkyWay) { UserDefaults.standard.set(newValue, forKey: "showMilkyWay") } }
-    }
-
-    /// Reference overlays drawn in the equatorial mesh frame.
-    var showEcliptic: Bool {
-        get { access(keyPath: \.showEcliptic); return defaults(bool: "showEcliptic", default: false) }
-        set { withMutation(keyPath: \.showEcliptic) { UserDefaults.standard.set(newValue, forKey: "showEcliptic") } }
-    }
-
-    var showCelestialEquator: Bool {
-        get { access(keyPath: \.showCelestialEquator); return defaults(bool: "showCelestialEquator", default: false) }
-        set { withMutation(keyPath: \.showCelestialEquator) { UserDefaults.standard.set(newValue, forKey: "showCelestialEquator") } }
-    }
-
-    var showCoordinateGrid: Bool {
-        get { access(keyPath: \.showCoordinateGrid); return defaults(bool: "showCoordinateGrid", default: false) }
-        set { withMutation(keyPath: \.showCoordinateGrid) { UserDefaults.standard.set(newValue, forKey: "showCoordinateGrid") } }
-    }
-
-    /// Bortle dark-sky class (1 = pristine … 9 = inner city). Caps how faint
-    /// the naked-eye sky gets and drives horizon light-pollution glow.
-    var bortleClass: Int {
-        get {
-            access(keyPath: \.bortleClass)
-            let stored = UserDefaults.standard.integer(forKey: "bortleClass")
-            return stored == 0 ? 4 : min(9, max(1, stored))
-        }
-        set { withMutation(keyPath: \.bortleClass) { UserDefaults.standard.set(min(9, max(1, newValue)), forKey: "bortleClass") } }
-    }
-
     /// Naked-eye limiting magnitude implied by the Bortle class
     /// (Bortle 1 → 7.5, Bortle 9 → 4.0, linear between).
     var bortleLimitingMagnitude: Double {
@@ -247,31 +300,16 @@ final class AppState {
         min(magnitudeLimit, bortleLimitingMagnitude)
     }
 
-    /// Faintest star magnitude rendered in AR.
-    var magnitudeLimit: Double {
-        get {
-            access(keyPath: \.magnitudeLimit)
-            let stored = UserDefaults.standard.double(forKey: "magnitudeLimit")
-            return stored == 0 ? 5.5 : stored
-        }
-        set { withMutation(keyPath: \.magnitudeLimit) { UserDefaults.standard.set(newValue, forKey: "magnitudeLimit") } }
-    }
-
-    private func defaults(bool key: String, default defaultValue: Bool) -> Bool {
-        if UserDefaults.standard.object(forKey: key) == nil { return defaultValue }
-        return UserDefaults.standard.bool(forKey: key)
-    }
-
     // MARK: Satellite favorites & pass notifications
 
     var favoriteSatelliteIDs: Set<String> {
         get {
             access(keyPath: \.favoriteSatelliteIDs)
-            let stored = UserDefaults.standard.stringArray(forKey: "favoriteSatelliteIDs") ?? []
-            return Set(stored)
+            return _favoriteSatelliteIDs
         }
         set {
             withMutation(keyPath: \.favoriteSatelliteIDs) {
+                _favoriteSatelliteIDs = newValue
                 UserDefaults.standard.set(Array(newValue), forKey: "favoriteSatelliteIDs")
             }
         }
@@ -284,11 +322,6 @@ final class AppState {
         if favorites.contains(id) { favorites.remove(id) } else { favorites.insert(id) }
         favoriteSatelliteIDs = favorites
         Task { await refreshPassNotifications() }
-    }
-
-    var passNotificationsEnabled: Bool {
-        get { access(keyPath: \.passNotificationsEnabled); return defaults(bool: "passNotificationsEnabled", default: false) }
-        set { withMutation(keyPath: \.passNotificationsEnabled) { UserDefaults.standard.set(newValue, forKey: "passNotificationsEnabled") } }
     }
 
     /// Recompute upcoming visible passes for favorited satellites and schedule
@@ -308,6 +341,21 @@ final class AppState {
         await notificationScheduler.reschedule(passes: passes)
     }
 
+    /// Fetch upcoming sky events for the next 30 days and schedule (or clear)
+    /// their evening-before notifications.
+    func refreshEventNotifications() async {
+        guard eventNotificationsEnabled else {
+            await eventNotificationScheduler.cancelAll()
+            return
+        }
+        let observer = observer
+        let start = Date()
+        let events = await Task.detached(priority: .utility) {
+            EventsEngine.upcoming(observer: observer, startingAt: start, days: 30)
+        }.value
+        await eventNotificationScheduler.reschedule(events: events)
+    }
+
     // MARK: Lifecycle
 
     func start() {
@@ -315,8 +363,21 @@ final class AppState {
         // afterwards request it up front.
         if hasOnboarded { locationService.requestLocation() }
         Task {
+            await upgradeToDeepCatalog()
             await satelliteService.start()
             await refreshPassNotifications()
+            await refreshEventNotifications()
+        }
+    }
+
+    /// Loads the HYG deep-star catalog off the main actor and swaps it in.
+    /// No-op when hygdata.csv is not bundled.
+    private func upgradeToDeepCatalog() async {
+        let deepStars = await Task.detached(priority: .utility) {
+            HYGCatalogLoader.loadIfAvailable()
+        }.value
+        if let stars = deepStars {
+            catalog = SkyCatalog(deepStars: stars)
         }
     }
 }

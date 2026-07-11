@@ -9,9 +9,10 @@ struct SearchView: View {
     @Environment(AppState.self) private var appState
     @Environment(\.dismiss) private var dismiss
     @State private var query = ""
+    @State private var debouncedQuery = ""
 
     private var results: [any CelestialObject] {
-        appState.search(query)
+        appState.search(debouncedQuery)
     }
 
     var body: some View {
@@ -30,6 +31,8 @@ struct SearchView: View {
                             suggestionRow(m31)
                         }
                     }
+                } else if results.isEmpty {
+                    ContentUnavailableView.search(text: debouncedQuery)
                 } else {
                     ForEach(results, id: \.id) { object in
                         resultRow(object)
@@ -43,6 +46,12 @@ struct SearchView: View {
                 ToolbarItem(placement: .cancellationAction) {
                     Button("Done") { dismiss() }
                 }
+            }
+            .task(id: query) {
+                do {
+                    try await Task.sleep(for: .milliseconds(150))
+                    debouncedQuery = query
+                } catch { }
             }
         }
     }
@@ -61,9 +70,8 @@ struct SearchView: View {
             dismiss()
         } label: {
             HStack {
-                Image(systemName: object.kind.iconSystemName)
-                    .foregroundStyle(.yellow)
-                    .frame(width: 28)
+                ObjectGlyph(object: object, size: 30)
+                    .frame(width: 34)
                 VStack(alignment: .leading, spacing: 2) {
                     Text(object.name).foregroundStyle(.primary)
                     Text(object.subtitle).font(.caption).foregroundStyle(.secondary)

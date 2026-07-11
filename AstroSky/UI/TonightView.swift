@@ -14,12 +14,22 @@ struct TonightView: View {
     @State private var passesLoaded = false
     @State private var brightestFirst = false
     @State private var events: [AstroEvent] = []
+    @State private var eventsLoaded = false
+    @State private var twilight: TwilightTimes? = nil
+    @State private var moonPhase: MoonEphemeris.PhaseInfo? = nil
+    @State private var moonEvents: RiseSetEvents? = nil
+    @State private var planetInfos: [(planet: PlanetObject, altStr: String, isUp: Bool, magStr: String)] = []
+    @State private var telescopeTargets: [TonightTarget] = []
+    @State private var telescopeTargetsLoaded = false
 
     /// Passes ordered either by time (default) or by peak brightness.
     private var sortedPasses: [SatellitePass] {
         guard brightestFirst else { return passes }
         return passes.sorted { ($0.peakMagnitude ?? 99) < ($1.peakMagnitude ?? 99) }
     }
+
+    /// Day-granularity key to trigger ephemeris computation once per day.
+    private var dayKey: Int { Int(Date().timeIntervalSince1970 / 86400) }
 
     var body: some View {
         NavigationStack {
@@ -28,9 +38,20 @@ struct TonightView: View {
                 sunSection
                 moonSection
                 planetsSection
+                telescopeSection
                 passesSection
             }
             .navigationTitle("Tonight")
+            .toolbar {
+                ToolbarItem(placement: .topBarTrailing) {
+                    NavigationLink {
+                        ObservationLogView()
+                    } label: {
+                        Image(systemName: "book.closed")
+                    }
+                    .accessibilityLabel("Observing Log")
+                }
+            }
             .refreshable {
                 await appState.satelliteService.refresh()
                 await reloadPasses()
@@ -41,6 +62,41 @@ struct TonightView: View {
                 }
                 if events.isEmpty {
                     await reloadEvents()
+                }
+                if !telescopeTargetsLoaded {
+                    telescopeTargets = await TonightPlanner.compute(appState: appState)
+                    telescopeTargetsLoaded = true
+                }
+            }
+            .task(id: dayKey) {
+                let obs = appState.observer
+                let dayStart = Calendar.current.startOfDay(for: Date())
+
+                // Twilight computation: expensive bisection, runs off main thread
+                twilight = await Task.detached(priority: .utility) {
+                    RiseSetCalculator.twilight(observer: obs, startingAt: dayStart)
+                }.value
+
+                // Moon phase: fast, compute on main
+                moonPhase = MoonEphemeris.phase(julianDate: appState.skyJulianDate)
+
+                // Moon rise/set: expensive bisection, runs off main thread
+                moonEvents = await Task.detached(priority: .utility) {
+                    RiseSetCalculator.events(startingAt: dayStart,
+                                             threshold: RiseSetCalculator.Threshold.moon) { date in
+                        let jd = AstroTime.julianDate(date)
+                        let eq = MoonEphemeris.position(julianDate: jd).equatorial
+                        return CoordinateTransforms.horizontal(of: eq, julianDate: jd, observer: obs).altitude
+                    }
+                }.value
+
+                // Planets: precompute all info, map to avoid repeated ephemeris calls per row
+                let jd = appState.skyJulianDate
+                planetInfos = appState.catalog.planets.map { planet in
+                    let pos = PlanetEphemeris.position(of: planet.planet, julianDate: jd)
+                    let h = planet.horizontal(julianDate: jd, observer: obs)
+                    return (planet, AstroFormat.degrees(h.altitude) + " · " + h.compassDirection,
+                            h.isAboveHorizon, AstroFormat.magnitude(pos.magnitude))
                 }
             }
         }
@@ -67,6 +123,13 @@ struct TonightView: View {
                     }
                 }
             }
+        } else if !eventsLoaded {
+            Section("Sky events · next 30 days") {
+                HStack {
+                    ProgressView()
+                    Text("Scanning for events…").foregroundStyle(.secondary)
+                }
+            }
         }
     }
 
@@ -76,53 +139,47 @@ struct TonightView: View {
         events = await Task.detached(priority: .utility) {
             EventsEngine.upcoming(observer: observer, startingAt: start, days: 30)
         }.value
+        eventsLoaded = true
     }
 
     // MARK: Sun & twilight
 
     private var sunSection: some View {
-        let dayStart = Calendar.current.startOfDay(for: Date())
-        let twilight = RiseSetCalculator.twilight(observer: appState.observer, startingAt: dayStart)
-        return Section("Sun & twilight") {
-            row("Sunrise", AstroFormat.time(twilight.sunrise), icon: "sunrise")
-            row("Sunset", AstroFormat.time(twilight.sunset), icon: "sunset")
-            row("Civil dusk", AstroFormat.time(twilight.civilDusk), icon: "sun.horizon")
-            row("Astronomical dusk", AstroFormat.time(twilight.astronomicalDusk), icon: "moon.haze")
-            row("Astronomical dawn", AstroFormat.time(twilight.astronomicalDawn), icon: "moon.haze.fill")
+        Section("Sun & twilight") {
+            row("Sunrise", twilight.map { AstroFormat.time($0.sunrise) } ?? "Loading…", icon: "sunrise")
+            row("Sunset", twilight.map { AstroFormat.time($0.sunset) } ?? "Loading…", icon: "sunset")
+            row("Civil dusk", twilight.map { AstroFormat.time($0.civilDusk) } ?? "—", icon: "sun.horizon")
+            row("Astronomical dusk", twilight.map { AstroFormat.time($0.astronomicalDusk) } ?? "—", icon: "moon.haze")
+            row("Astronomical dawn", twilight.map { AstroFormat.time($0.astronomicalDawn) } ?? "—", icon: "moon.haze.fill")
         }
     }
 
     // MARK: Moon
 
     private var moonSection: some View {
-        let jd = appState.skyJulianDate
-        let phase = MoonEphemeris.phase(julianDate: jd)
-        let dayStart = Calendar.current.startOfDay(for: Date())
-        let observer = appState.observer
-        let events = RiseSetCalculator.events(startingAt: dayStart,
-                                              threshold: RiseSetCalculator.Threshold.moon) { date in
-            let jd = AstroTime.julianDate(date)
-            let eq = MoonEphemeris.position(julianDate: jd).equatorial
-            return CoordinateTransforms.horizontal(of: eq, julianDate: jd, observer: observer).altitude
-        }
-
-        return Section("Moon") {
-            HStack(spacing: 16) {
-                MoonPhaseView(phase: phase)
-                    .frame(width: 64, height: 64)
-                VStack(alignment: .leading, spacing: 4) {
-                    Text(phase.phaseName).font(.headline)
-                    Text("\(Int((phase.illuminatedFraction * 100).rounded()))% illuminated")
-                        .font(.subheadline)
-                        .foregroundStyle(.secondary)
+        Section("Moon") {
+            if let phase = moonPhase {
+                NavigationLink {
+                    ObjectDetailView(object: appState.catalog.moon)
+                } label: {
+                    HStack(spacing: 16) {
+                        MoonPhaseView(phase: phase)
+                            .frame(width: 64, height: 64)
+                        VStack(alignment: .leading, spacing: 4) {
+                            Text(phase.phaseName).font(.headline)
+                            Text("\(Int((phase.illuminatedFraction * 100).rounded()))% illuminated")
+                                .font(.subheadline)
+                                .foregroundStyle(.secondary)
+                        }
+                        Spacer()
+                    }
                 }
-                Spacer()
             }
-            .contentShape(Rectangle())
-            .onTapGesture { appState.select(appState.catalog.moon) }
 
-            row("Moonrise", AstroFormat.time(events.rise), icon: "moonrise")
-            row("Moonset", AstroFormat.time(events.set), icon: "moonset")
+            if let events = moonEvents {
+                row("Moonrise", AstroFormat.time(events.rise), icon: "moonrise")
+                row("Moonset", AstroFormat.time(events.set), icon: "moonset")
+            }
         }
     }
 
@@ -130,37 +187,77 @@ struct TonightView: View {
 
     private var planetsSection: some View {
         Section("Planets tonight") {
-            ForEach(appState.catalog.planets, id: \.id) { planet in
+            ForEach(planetInfos, id: \.planet.id) { info in
                 NavigationLink {
-                    ObjectDetailView(object: planet)
+                    ObjectDetailView(object: info.planet)
                 } label: {
-                    planetRow(planet)
+                    HStack {
+                        PlanetGlyph(planet: info.planet.planet, size: 30).frame(width: 34)
+                        VStack(alignment: .leading, spacing: 2) {
+                            Text(info.planet.name)
+                            Text("mag \(info.magStr)")
+                                .font(.caption)
+                                .foregroundStyle(.secondary)
+                        }
+                        Spacer()
+                        VStack(alignment: .trailing, spacing: 2) {
+                            Text(info.isUp ? "Up now" : "Below horizon")
+                                .font(.caption.weight(.semibold))
+                                .foregroundStyle(info.isUp ? .green : .secondary)
+                            Text(info.altStr)
+                                .font(.caption2)
+                                .foregroundStyle(.secondary)
+                        }
+                    }
                 }
             }
         }
     }
 
-    private func planetRow(_ planet: PlanetObject) -> some View {
-        let jd = appState.skyJulianDate
-        let position = PlanetEphemeris.position(of: planet.planet, julianDate: jd)
-        let horizontal = planet.horizontal(julianDate: jd, observer: appState.observer)
-        return HStack {
-            Text(planet.planet.symbol).font(.title3).frame(width: 28)
-            VStack(alignment: .leading, spacing: 2) {
-                Text(planet.name)
-                Text("mag \(AstroFormat.magnitude(position.magnitude))")
-                    .font(.caption)
-                    .foregroundStyle(.secondary)
+    // MARK: Telescope targets
+
+    @ViewBuilder private var telescopeSection: some View {
+        Section {
+            if !telescopeTargetsLoaded {
+                HStack {
+                    ProgressView()
+                    Text("Finding tonight's targets…").foregroundStyle(.secondary)
+                }
+            } else if telescopeTargets.isEmpty {
+                if appState.activeOptics == nil {
+                    NavigationLink { EquipmentEditorView() } label: {
+                        Label("Set up a telescope to see tonight's best targets",
+                              systemImage: "eyeglasses")
+                    }
+                }
+            } else {
+                ForEach(telescopeTargets.prefix(5)) { target in
+                    NavigationLink {
+                        ObjectDetailView(object: target.object)
+                    } label: {
+                        HStack {
+                            ObjectGlyph(object: target.object, size: 30).frame(width: 34)
+                            VStack(alignment: .leading, spacing: 2) {
+                                Text(target.object.name)
+                                Text(target.object.subtitle).font(.caption).foregroundStyle(.secondary)
+                            }
+                            Spacer()
+                            Text(target.verdict.rawValue)
+                                .font(.caption.weight(.semibold))
+                                .foregroundStyle(.secondary)
+                        }
+                    }
+                }
+                NavigationLink {
+                    ObserveTonightView()
+                } label: {
+                    Text("See all \(telescopeTargets.count) targets")
+                        .font(.subheadline)
+                        .foregroundStyle(.indigo)
+                }
             }
-            Spacer()
-            VStack(alignment: .trailing, spacing: 2) {
-                Text(horizontal.isAboveHorizon ? "Up now" : "Below horizon")
-                    .font(.caption.weight(.semibold))
-                    .foregroundStyle(horizontal.isAboveHorizon ? .green : .secondary)
-                Text("\(AstroFormat.degrees(horizontal.altitude)) · \(horizontal.compassDirection)")
-                    .font(.caption2)
-                    .foregroundStyle(.secondary)
-            }
+        } header: {
+            Text("Best for your telescope")
         }
     }
 
@@ -211,9 +308,8 @@ struct TonightView: View {
             PassDetailView(pass: pass)
         } label: {
             HStack {
-                Image(systemName: "antenna.radiowaves.left.and.right")
-                    .foregroundStyle(.green)
-                    .frame(width: 28)
+                SatelliteGlyph(size: 30)
+                    .frame(width: 34)
                 VStack(alignment: .leading, spacing: 2) {
                     Text(pass.satelliteName).foregroundStyle(.primary)
                     Text("\(AstroFormat.time(pass.start)) → \(AstroFormat.time(pass.end))")
@@ -249,8 +345,28 @@ struct TonightView: View {
             }
             return all.filter(\.isVisible).sorted { $0.start < $1.start }
         }.value
-        passes = computed
+        passes = Self.deduplicated(computed)
         passesLoaded = true
+    }
+
+    /// Collapse near-simultaneous passes of the same-named satellite. The three
+    /// CSS station modules (Tianhe/Wentian/Mengtian) fly together and are
+    /// distinct NORAD objects, so they would otherwise list as three identical
+    /// "CSS" passes. Keeps the highest-altitude of each overlapping group.
+    private static func deduplicated(_ passes: [SatellitePass]) -> [SatellitePass] {
+        var kept: [SatellitePass] = []
+        for pass in passes {
+            if let index = kept.firstIndex(where: {
+                $0.satelliteName == pass.satelliteName
+                    && pass.start <= $0.end.addingTimeInterval(60)
+                    && $0.start <= pass.end.addingTimeInterval(60)
+            }) {
+                if pass.maxAltitude > kept[index].maxAltitude { kept[index] = pass }
+            } else {
+                kept.append(pass)
+            }
+        }
+        return kept
     }
 
     private func row(_ label: String, _ value: String, icon: String) -> some View {

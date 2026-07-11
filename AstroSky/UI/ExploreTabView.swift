@@ -6,6 +6,7 @@
 //  the worlds to learn about them.
 //
 
+import ARKit
 import SwiftUI
 
 struct ExploreTabView: View {
@@ -13,10 +14,21 @@ struct ExploreTabView: View {
     @State private var distanceMode: DistanceMode = .fit
     @State private var selected: ScaleBody?
     @State private var isPlaced = false
+    /// Height of the model above the placed surface, in meters.
+    @State private var heightMeters: Float = 0
+
+    private var isAR: Bool { ARWorldTrackingConfiguration.isSupported }
 
     var body: some View {
-        ZStack {
-            ScaleARView(scene: scene, distanceMode: distanceMode,
+        guard isAR else {
+            return AnyView(ContentUnavailableView(
+                "AR Not Available",
+                systemImage: "xmark.circle",
+                description: Text("This device doesn't support ARKit world tracking. The scale model view requires a device with a motion coprocessor.")
+            ))
+        }
+        return AnyView(ZStack {
+            ScaleARView(scene: scene, distanceMode: distanceMode, heightMeters: heightMeters,
                         onSelect: { selected = $0 },
                         onPlacementChange: { isPlaced = $0 })
                 .id(scene.id)   // rebuild cleanly when the scene changes
@@ -32,6 +44,9 @@ struct ExploreTabView: View {
                         .padding(10)
                         .background(.ultraThinMaterial, in: Capsule())
                         .padding(.bottom, 24)
+                } else if isAR {
+                    heightControl
+                        .padding(.bottom, 20)
                 }
             }
             .padding()
@@ -39,7 +54,7 @@ struct ExploreTabView: View {
         .sheet(item: $selected) { body in
             BodyInfoSheet(model: body)
                 .presentationDetents([.medium])
-        }
+        })
     }
 
     private var controls: some View {
@@ -61,8 +76,20 @@ struct ExploreTabView: View {
                 ForEach(DistanceMode.allCases, id: \.self) { Text($0.title).tag($0) }
             }
             .pickerStyle(.segmented)
-            .frame(width: 190)
         }
+    }
+
+    /// Raise the model off the floor so it's comfortable standing outdoors.
+    private var heightControl: some View {
+        HStack(spacing: 12) {
+            Image(systemName: "arrow.up.and.down")
+            Slider(value: $heightMeters, in: 0...1.8)
+            Text("\(heightMeters * 3.28084, specifier: "%.1f") ft")
+                .font(.caption.monospacedDigit())
+                .frame(width: 46, alignment: .trailing)
+        }
+        .padding(.horizontal, 16).padding(.vertical, 10)
+        .background(.ultraThinMaterial, in: Capsule())
     }
 }
 

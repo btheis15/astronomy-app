@@ -11,16 +11,8 @@ import SwiftUI
 
 struct ObserveTonightView: View {
     @Environment(AppState.self) private var appState
-    @State private var targets: [Target] = []
+    @State private var targets: [TonightTarget] = []
     @State private var loaded = false
-
-    struct Target: Identifiable {
-        let object: any CelestialObject
-        let verdict: VisibilityAssessment.Verdict
-        let maxAltitude: Double
-        let bestTime: Date?
-        var id: String { object.id }
-    }
 
     var body: some View {
         List {
@@ -44,7 +36,7 @@ struct ObserveTonightView: View {
                     NavigationLink {
                         ObjectDetailView(object: target.object)
                     } label: {
-                        row(target)
+                        targetRow(target)
                     }
                 }
             }
@@ -53,9 +45,9 @@ struct ObserveTonightView: View {
         .task { if !loaded { await load() } }
     }
 
-    private func row(_ target: Target) -> some View {
+    private func targetRow(_ target: TonightTarget) -> some View {
         HStack {
-            Image(systemName: target.object.kind.iconSystemName).foregroundStyle(.yellow).frame(width: 28)
+            ObjectGlyph(object: target.object, size: 30).frame(width: 34)
             VStack(alignment: .leading, spacing: 2) {
                 Text(target.object.name)
                 Text(target.object.subtitle).font(.caption).foregroundStyle(.secondary)
@@ -64,7 +56,7 @@ struct ObserveTonightView: View {
             VStack(alignment: .trailing, spacing: 2) {
                 Text(target.verdict.rawValue).font(.caption.weight(.semibold))
                 if let best = target.bestTime {
-                    Text(best.formatted(date: .omitted, time: .shortened))
+                    Text(AstroFormat.time(best))
                         .font(.caption2).foregroundStyle(.secondary)
                 }
             }
@@ -72,42 +64,7 @@ struct ObserveTonightView: View {
     }
 
     private func load() async {
-        let optics = appState.activeOptics
-        let bortle = appState.bortleClass
-        let observer = appState.observer
-        let now = Date()
-
-        // Candidate pool: solar system, minor bodies, deep sky (skip stars — too many).
-        var candidates: [any CelestialObject] = [appState.catalog.sun, appState.catalog.moon]
-        candidates.append(contentsOf: appState.catalog.planets.map { $0 as any CelestialObject })
-        candidates.append(contentsOf: appState.catalog.minorBodies.map { $0 as any CelestialObject })
-        candidates.append(contentsOf: appState.catalog.deepSky.map { $0 as any CelestialObject })
-        candidates.removeAll { $0.kind == .sun }   // never a night target
-
-        let jd = appState.skyJulianDate
-        var result: [Target] = []
-        for object in candidates {
-            let placement = TonightPlacementCalculator.compute(object: object, observer: observer, date: now)
-            guard placement.isWellPlaced else { continue }
-            let verdict: VisibilityAssessment.Verdict
-            if let optics {
-                let size = AngularSizeSource.angularSizeRadians(for: object, julianDate: jd)
-                verdict = TelescopeVisibility.assess(object: object, optics: optics,
-                                                     angularSizeRadians: size, bortleClass: bortle).verdict
-            } else {
-                verdict = .visible
-            }
-            guard verdict != .notVisible else { continue }
-            result.append(Target(object: object, verdict: verdict,
-                                  maxAltitude: placement.maxAltitudeDegrees, bestTime: placement.bestTime))
-        }
-        // Easiest first, then highest.
-        let order: [VisibilityAssessment.Verdict] = [.easy, .visible, .challenging, .notVisible]
-        targets = result.sorted {
-            let a = order.firstIndex(of: $0.verdict) ?? 9
-            let b = order.firstIndex(of: $1.verdict) ?? 9
-            return a != b ? a < b : $0.maxAltitude > $1.maxAltitude
-        }
+        targets = await TonightPlanner.compute(appState: appState)
         loaded = true
     }
 }

@@ -186,6 +186,15 @@ struct EventsTests {
         let june = MeteorShowers.active(on: utc(2026, 6, 15))
         #expect(!june.contains { $0.name == "Perseids" })
     }
+
+    @Test func upcomingEventsContainMoonPhasesOver90Days() {
+        let observer = Observer(latitudeDegrees: 40.0, longitudeDegrees: -75.0)
+        let events = EventsEngine.upcoming(observer: observer, startingAt: utc(2026, 1, 1), days: 90)
+        #expect(!events.isEmpty)
+        // Three synodic months in 90 days → at least 3 full and 3 new moons.
+        let moonPhases = events.filter { $0.kind == .fullMoon || $0.kind == .newMoon }
+        #expect(moonPhases.count >= 3)
+    }
 }
 
 struct MinorBodyTests {

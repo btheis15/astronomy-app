@@ -12,6 +12,9 @@
 //
 
 import Foundation
+import OSLog
+
+private let logger = Logger(subsystem: "com.astrosky", category: "ephemeris")
 
 enum HYGCatalogLoader {
     static let bundledFileName = "hygdata"
@@ -21,11 +24,17 @@ enum HYGCatalogLoader {
     ///   the naked-eye limit; keeps memory and mesh sizes sane).
     /// - Returns: stars sorted brightest-first, or nil when no CSV is bundled.
     static func loadIfAvailable(magnitudeLimit: Double = 6.5) -> [Star]? {
-        guard let url = Bundle.main.url(forResource: bundledFileName, withExtension: "csv"),
-              let contents = try? String(contentsOf: url, encoding: .utf8) else {
+        guard let url = Bundle.main.url(forResource: bundledFileName, withExtension: "csv") else {
+            logger.debug("HYG catalog file not found in bundle")
             return nil
         }
-        return parse(csv: contents, magnitudeLimit: magnitudeLimit)
+        do {
+            let contents = try String(contentsOf: url, encoding: .utf8)
+            return parse(csv: contents, magnitudeLimit: magnitudeLimit)
+        } catch {
+            logger.error("Failed to load HYG catalog: \(error.localizedDescription, privacy: .public)")
+            return nil
+        }
     }
 
     static func parse(csv: String, magnitudeLimit: Double) -> [Star] {

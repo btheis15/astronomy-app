@@ -12,8 +12,8 @@ import Foundation
 // MARK: - Moon phase
 
 struct MoonPhaseIntent: AppIntent {
-    static var title: LocalizedStringResource = "Moon Phase"
-    static var description = IntentDescription("Tells you the current Moon phase and illumination.")
+    static let title: LocalizedStringResource = "Moon Phase"
+    static let description = IntentDescription("Tells you the current Moon phase and illumination.")
 
     func perform() async throws -> some IntentResult & ProvidesDialog {
         let phase = MoonEphemeris.phase(julianDate: AstroTime.julianDate(Date()))
@@ -27,8 +27,8 @@ struct MoonPhaseIntent: AppIntent {
 enum PlanetChoice: String, AppEnum {
     case mercury, venus, mars, jupiter, saturn, uranus, neptune
 
-    static var typeDisplayRepresentation = TypeDisplayRepresentation(name: "Planet")
-    static var caseDisplayRepresentations: [PlanetChoice: DisplayRepresentation] = [
+    static let typeDisplayRepresentation = TypeDisplayRepresentation(name: "Planet")
+    static let caseDisplayRepresentations: [PlanetChoice: DisplayRepresentation] = [
         .mercury: "Mercury", .venus: "Venus", .mars: "Mars", .jupiter: "Jupiter",
         .saturn: "Saturn", .uranus: "Uranus", .neptune: "Neptune",
     ]
@@ -47,8 +47,8 @@ enum PlanetChoice: String, AppEnum {
 }
 
 struct PlanetVisibilityIntent: AppIntent {
-    static var title: LocalizedStringResource = "Is a Planet Visible Tonight"
-    static var description = IntentDescription("Checks whether a planet rises high enough to see tonight.")
+    static let title: LocalizedStringResource = "Is a Planet Visible Tonight"
+    static let description = IntentDescription("Checks whether a planet rises high enough to see tonight.")
 
     @Parameter(title: "Planet")
     var planet: PlanetChoice
@@ -79,8 +79,8 @@ struct PlanetVisibilityIntent: AppIntent {
 // MARK: - Next ISS pass
 
 struct NextISSPassIntent: AppIntent {
-    static var title: LocalizedStringResource = "Next ISS Pass"
-    static var description = IntentDescription("Finds the next visible pass of the International Space Station.")
+    static let title: LocalizedStringResource = "Next ISS Pass"
+    static let description = IntentDescription("Finds the next visible pass of the International Space Station.")
 
     func perform() async throws -> some IntentResult & ProvidesDialog {
         let observer = Observer.lastKnown

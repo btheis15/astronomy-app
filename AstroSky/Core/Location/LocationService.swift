@@ -21,6 +21,8 @@ final class LocationService: NSObject, CLLocationManagerDelegate {
     /// Compass heading accuracy in degrees (± value), or nil when heading is
     /// unavailable or uncalibrated. Small values mean a well-calibrated compass.
     private(set) var headingAccuracy: Double?
+    /// Most recent true heading in degrees CW from North (0–360). Negative means invalid.
+    private(set) var trueHeadingDegrees: Double = -1
     /// True when `observer` came from an actual fix or manual entry.
     private(set) var hasRealLocation = false
     /// When set, GPS updates are ignored.
@@ -98,9 +100,16 @@ final class LocationService: NSObject, CLLocationManagerDelegate {
     nonisolated func locationManager(_ manager: CLLocationManager, didUpdateHeading newHeading: CLHeading) {
         // Negative accuracy means the heading is invalid/uncalibrated.
         let accuracy = newHeading.headingAccuracy
+        let trueHeading = newHeading.trueHeading
         Task { @MainActor in
             self.headingAccuracy = accuracy >= 0 ? accuracy : nil
+            self.trueHeadingDegrees = trueHeading
         }
+    }
+
+    nonisolated func locationManagerShouldDisplayHeadingCalibration(_ manager: CLLocationManager) -> Bool {
+        // Allow iOS to show the figure-8 calibration panel whenever needed.
+        return true
     }
 
     private func reverseGeocode(_ location: CLLocation) async {

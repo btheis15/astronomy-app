@@ -15,6 +15,8 @@ import simd
 struct ScaleARView: UIViewRepresentable {
     let scene: ScaleScene
     let distanceMode: DistanceMode
+    /// Height of the model above the placed surface, in meters (AR only).
+    var heightMeters: Float = 0
     var onSelect: (ScaleBody) -> Void
     var onPlacementChange: (Bool) -> Void
 
@@ -28,6 +30,7 @@ struct ScaleARView: UIViewRepresentable {
 
     func updateUIView(_ uiView: ARView, context: Context) {
         context.coordinator.update(scene: scene, distanceMode: distanceMode)
+        context.coordinator.setHeight(heightMeters)
     }
 
     static func dismantleUIView(_ uiView: ARView, coordinator: ScaleARScene) {
@@ -48,6 +51,7 @@ final class ScaleARScene: NSObject {
     private var distanceMode: DistanceMode = .fit
     private var isPlaced = false
     private var currentScale: Float = 1
+    private var heightMeters: Float = 0
 
     // Non-AR camera.
     private let camera = PerspectiveCamera()
@@ -104,6 +108,13 @@ final class ScaleARScene: NSObject {
         if changed && isPlaced { rebuildModel() }
     }
 
+    /// Raise the placed model above its surface (AR only) so it's comfortable to
+    /// view standing up outdoors, not just on a table.
+    func setHeight(_ height: Float) {
+        heightMeters = height
+        if isAR && isPlaced { modelHolder.position = SIMD3(0, height, 0) }
+    }
+
     func tearDown() {
         if isAR { arView.session.pause() }
     }
@@ -129,6 +140,7 @@ final class ScaleARScene: NSObject {
             arView.scene.addAnchor(anchor)
             placementAnchor = anchor
             isPlaced = true
+            modelHolder.position = SIMD3(0, heightMeters, 0)
             rebuildModel()
             onPlacementChange(true)
             return

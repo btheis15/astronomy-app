@@ -6,18 +6,23 @@
 //  time, location, settings and live satellite data.
 //
 //  Two display modes share the same scene:
-//  • AR mode — camera passthrough, `.gravityAndHeading` world alignment,
-//    so scene axes are geographically aligned (x=east, y=up, z=south).
+//  • AR mode — camera passthrough, `.gravity` world alignment (+Y = up,
+//    +X/+Z arbitrary). NorthCalibrator fuses CLHeading with the ARKit
+//    camera azimuth to keep the sky geographically locked.
 //  • Manual mode — `.nonAR` camera on a black sky, driven by drag/pinch.
 //    Used in Simulator, on devices without AR support, or by user choice.
 //
 
 import ARKit
 import Combine
+import CoreMotion
 import Foundation
+import OSLog
 import RealityKit
 import UIKit
 import simd
+
+private let arLogger = Logger(subsystem: "com.astrosky", category: "ar")
 
 /// What the on-screen guidance arrow should show for a "Find in AR" target.
 struct GuideReadout: Equatable {
@@ -35,7 +40,9 @@ struct GuideReadout: Equatable {
 final class SkyRenderer: NSObject {
     let arView: ARView
     let isARMode: Bool
+    let isVRMode: Bool
     private unowned let appState: AppState
+    private var motionManager: CMMotionManager?
 
     var onGuideUpdate: ((GuideReadout?) -> Void)?
 
@@ -59,18 +66,29 @@ final class SkyRenderer: NSObject {
     private let selectionHighlight: Entity
     private var satelliteEntities: [String: Entity] = [:]
     private let satelliteRoot = Entity()
-    private var satelliteTrack = Entity()
+    private let satelliteTrack = Entity()
     private var meteorRadiants = Entity()
     private var lastActiveShowers: Set<String> = []
+    private var lastShowerDay = Int.min
     private let horizonGlow: Entity
 
     // Update bookkeeping.
     private var updateTimer: Timer?
     private var sceneSubscription: Cancellable?
     private var lastSolarUpdateJD: Double = 0
+    private var lastTrackID: String?
+    private var lastTrackJD: Double = 0
     private var lastMagnitudeLimit: Double
     private var lastGuideNotify = Date.distantPast
     private var lastGuideReadout: GuideReadout?
+    nonisolated(unsafe) private var guideTaskPending = false
+
+    // North calibration (AR mode only).
+    private let northCalibrator = NorthCalibrator()
+    private var currentBaseOrientation: simd_quatf = .init(ix: 0, iy: 0, iz: 0, r: 1)
+
+    // VR-mode orientation smoothing.
+    private var filteredVROrientation: simd_quatf = .init(ix: 0, iy: 0, iz: 0, r: 1)
 
     // Manual-mode camera state.
     private let manualCamera = PerspectiveCamera()
@@ -80,12 +98,16 @@ final class SkyRenderer: NSObject {
 
     // MARK: Setup
 
-    init(appState: AppState, preferManualMode: Bool) {
+    init(appState: AppState, skyDisplayMode: SkyDisplayMode) {
         self.appState = appState
         self.lastMagnitudeLimit = appState.effectiveMagnitudeLimit
 
         let arSupported = ARWorldTrackingConfiguration.isSupported
-        self.isARMode = arSupported && !preferManualMode
+        self.isARMode = arSupported && skyDisplayMode == .ar
+        // VR mode: motion-tracked black background. Falls back to free-look if
+        // the device has no motion hardware (e.g. simulator).
+        let motionAvailable = CMMotionManager().isDeviceMotionAvailable
+        self.isVRMode = !self.isARMode && skyDisplayMode == .vr && motionAvailable
 
         arView = ARView(frame: .zero,
                         cameraMode: isARMode ? .ar : .nonAR,
@@ -137,8 +159,9 @@ final class SkyRenderer: NSObject {
 
         if isARMode {
             let configuration = ARWorldTrackingConfiguration()
-            configuration.worldAlignment = .gravityAndHeading
+            configuration.worldAlignment = .gravity
             configuration.planeDetection = []
+            arView.session.delegate = self
             arView.session.run(configuration)
         } else {
             arView.environment.background = .color(.black)
@@ -146,27 +169,50 @@ final class SkyRenderer: NSObject {
             let cameraAnchor = AnchorEntity(world: matrix_identity_float4x4)
             cameraAnchor.addChild(manualCamera)
             arView.scene.addAnchor(cameraAnchor)
-            applyManualCameraOrientation()
-            installManualGestures()
+            if isVRMode {
+                startMotionTracking()
+            } else {
+                applyManualCameraOrientation()
+                installManualGestures()
+            }
         }
 
         let tap = UITapGestureRecognizer(target: self, action: #selector(handleTap(_:)))
         arView.addGestureRecognizer(tap)
 
-        // AR fine-alignment: a two-finger horizontal drag rotates the overlay
-        // about the zenith to correct heading error. (Manual mode uses one- and
-        // two-finger drags for looking around, so this is AR-only.)
-        if isARMode {
+        // Two-finger pan: rotates the sky overlay about the zenith for heading
+        // correction. Available in AR and VR modes (not free-look, which uses
+        // drag for camera control).
+        if isARMode || isVRMode {
             let alignPan = UIPanGestureRecognizer(target: self, action: #selector(handleAlignPan(_:)))
             alignPan.minimumNumberOfTouches = 2
             alignPan.maximumNumberOfTouches = 2
             arView.addGestureRecognizer(alignPan)
         }
+        // Pinch-to-zoom in VR mode (free-look already installs it via installManualGestures).
+        if isVRMode {
+            let pinch = UIPinchGestureRecognizer(target: self, action: #selector(handlePinch(_:)))
+            arView.addGestureRecognizer(pinch)
+        }
 
-        // Per-frame camera tracking for the guidance arrow (throttled).
-        sceneSubscription = arView.scene.subscribe(to: SceneEvents.Update.self) { [weak self] _ in
+        // Phase-locked 60 Hz update: north calibration + sky orientation + guide arrow.
+        sceneSubscription = arView.scene.subscribe(to: SceneEvents.Update.self) { [weak self] event in
+            guard let self, !self.guideTaskPending else { return }
+            self.guideTaskPending = true
+            let dt = Float(event.deltaTime)
             Task { @MainActor [weak self] in
-                self?.updateGuideIfNeeded()
+                guard let self else { return }
+                self.guideTaskPending = false
+                if self.isARMode, let transform = self.arView.session.currentFrame?.camera.transform {
+                    self.northCalibrator.step(
+                        cameraTransform: transform,
+                        trueHeadingDeg: self.appState.locationService.trueHeadingDegrees,
+                        headingAccuracy: self.appState.locationService.headingAccuracy,
+                        dt: dt
+                    )
+                }
+                self.updateSkyOrientation()
+                self.updateGuideIfNeeded()
             }
         }
 
@@ -180,6 +226,9 @@ final class SkyRenderer: NSObject {
         updateTimer = timer
 
         tick()
+
+        // Photo sprites removed from sky view — objects use circle/ring glyphs
+        // only. Real photos are available in the object detail view.
     }
 
     /// Capture the current sky view (camera feed + overlay in AR mode) and
@@ -223,6 +272,9 @@ final class SkyRenderer: NSObject {
         sceneSubscription?.cancel()
         if isARMode {
             arView.session.pause()
+        } else if isVRMode {
+            motionManager?.stopDeviceMotionUpdates()
+            motionManager = nil
         }
     }
 
@@ -232,11 +284,11 @@ final class SkyRenderer: NSObject {
         let jd = appState.skyJulianDate
         let observer = appState.observer
 
-        // Sidereal rotation of the whole sky, with the manual fine-alignment
-        // offset applied about the zenith (scene +Y) on top of it.
-        let baseOrientation = SkySceneBuilder.skyOrientation(julianDate: jd, observer: observer)
-        let alignment = simd_quatf(angle: appState.skyAlignmentOffset, axis: SIMD3(0, 1, 0))
-        skyRoot.orientation = alignment * baseOrientation
+        // Store the sidereal base orientation; actual skyRoot.orientation is
+        // applied at 60 Hz in updateSkyOrientation() via SceneEvents.Update
+        // so the north-calibration slew is phase-locked to the renderer.
+        currentBaseOrientation = SkySceneBuilder.skyOrientation(julianDate: jd, observer: observer)
+        updateSkyOrientation()
 
         // Settings.
         constellationLines.isEnabled = appState.showConstellationLines
@@ -256,12 +308,17 @@ final class SkyRenderer: NSObject {
         satelliteRoot.isEnabled = appState.showSatellites
         updateLabelDensity()
 
-        // Meteor-shower radiants: rebuild when the active set changes.
+        // Meteor-shower radiants change at most daily — only recompute the
+        // active set when the (sky) day rolls over, not every tick.
         if appState.showMeteorShowers {
-            let active = Set(MeteorShowers.active(on: appState.skyDate).map(\.name))
-            if active != lastActiveShowers {
-                lastActiveShowers = active
-                rebuildMeteorRadiants()
+            let day = Int(appState.skyDate.timeIntervalSince1970 / 86_400)
+            if day != lastShowerDay {
+                lastShowerDay = day
+                let active = Set(MeteorShowers.active(on: appState.skyDate).map(\.name))
+                if active != lastActiveShowers {
+                    lastActiveShowers = active
+                    rebuildMeteorRadiants()
+                }
             }
         }
         meteorRadiants.isEnabled = appState.showMeteorShowers
@@ -286,6 +343,17 @@ final class SkyRenderer: NSObject {
         updateSatellites(julianDate: jd, observer: observer)
         updateSatelliteTrack(julianDate: jd, observer: observer)
         updateSelectionHighlight(julianDate: jd, observer: observer)
+    }
+
+    /// Applies `currentBaseOrientation` with the current north-calibration
+    /// offset and manual alignment offset to `skyRoot`. Called at 60 Hz
+    /// from SceneEvents.Update and also at 0.5 Hz from tick() for the
+    /// initial frame before the first render event fires.
+    private func updateSkyOrientation() {
+        let northOffset = isARMode ? northCalibrator.currentOffset : 0
+        let alignment = simd_quatf(angle: northOffset + appState.skyAlignmentOffset,
+                                   axis: SIMD3(0, 1, 0))
+        skyRoot.orientation = alignment * currentBaseOrientation
     }
 
     /// Effective vertical field of view in degrees. Manual mode tracks the
@@ -404,12 +472,24 @@ final class SkyRenderer: NSObject {
     /// sampled every 15 s (world frame). Rebuilt each tick so it follows both
     /// the satellite's motion and any time-travel change.
     private func updateSatelliteTrack(julianDate jd: Double, observer: Observer) {
-        satelliteTrack.removeFromParent()
-        satelliteTrack = Entity()
-        worldAnchor.addChild(satelliteTrack)
+        let satellite = appState.showSatellites ? appState.selectedObject as? Satellite : nil
 
-        guard appState.showSatellites,
-              let satellite = appState.selectedObject as? Satellite else { return }
+        // Nothing selected: clear an existing track once, then stay idle.
+        guard let satellite else {
+            if lastTrackID != nil {
+                satelliteTrack.children.removeAll()
+                lastTrackID = nil
+            }
+            return
+        }
+
+        // The ground track is 81 SGP4 samples + a polyline mesh — only rebuild
+        // when the selection changes or time has moved enough to matter.
+        if satellite.id == lastTrackID && abs(jd - lastTrackJD) * 86_400 < 5 { return }
+        lastTrackID = satellite.id
+        lastTrackJD = jd
+
+        satelliteTrack.children.removeAll()
 
         let radius = SkySceneBuilder.sphereRadius * 0.9
         let points: [SIMD3<Float>?] = stride(from: -600.0, through: 600.0, by: 15.0).map { offset in
@@ -504,7 +584,10 @@ final class SkyRenderer: NSObject {
     func identifyObject(along direction: SIMD3<Float>) -> (any CelestialObject)? {
         let jd = appState.skyJulianDate
         let observer = appState.observer
-        let maxAngle = 5.0 * AstroMath.degToRad
+        // Forgiving, zoom-aware catch radius: a constant ~13% of the field of
+        // view (with a generous floor) so tapping near an object selects it,
+        // even on a wide field where a fixed 5° felt tiny on screen.
+        let maxAngle = max(7.0, Double(currentFOV) * 0.13) * AstroMath.degToRad
 
         var best: (object: any CelestialObject, score: Double)?
 
@@ -560,6 +643,65 @@ final class SkyRenderer: NSObject {
         return best?.object
     }
 
+    // MARK: VR-mode motion tracking
+
+    private func startMotionTracking() {
+        let mm = CMMotionManager()
+        guard mm.isDeviceMotionAvailable else { return }
+        motionManager = mm
+        mm.deviceMotionUpdateInterval = 1.0 / 60.0
+        mm.startDeviceMotionUpdates(using: .xTrueNorthZVertical, to: .main) { [weak self] motion, _ in
+            guard let self, let motion else { return }
+            let rm = motion.attitude.rotationMatrix
+            Task { @MainActor [weak self] in
+                self?.applyMotionOrientation(rm)
+            }
+        }
+    }
+
+    /// Converts a CMRotationMatrix (body→NWU reference) into the camera
+    /// orientation for the RealityKit scene (x=East, y=Up, z=South).
+    ///
+    /// CMMotion reference (xMagneticNorthZVertical): x=North, y=West, z=Up.
+    /// RealityKit world (gravity+heading):           x=East,  y=Up,   z=South.
+    ///
+    /// The camera faces through the screen (+z body = screen normal), so that
+    /// holding the phone face-up shows the zenith, and tilting it northward
+    /// shows the northern sky — matching AR mode's viewer model.
+    private func applyMotionOrientation(_ rm: CMRotationMatrix) {
+        // Columns of rm are body-frame axes expressed in the NWU reference.
+        let bodyRight  = SIMD3<Float>(Float(rm.m11), Float(rm.m21), Float(rm.m31))
+        let bodyTop    = SIMD3<Float>(Float(rm.m12), Float(rm.m22), Float(rm.m32))
+        let bodyScreen = SIMD3<Float>(Float(rm.m13), Float(rm.m23), Float(rm.m33))
+
+        // NWU → RealityKit EUS: x_rl = -y_nwu, y_rl = z_nwu, z_rl = -x_nwu
+        func nwuToRL(_ v: SIMD3<Float>) -> SIMD3<Float> {
+            SIMD3<Float>(-v.y, v.z, -v.x)
+        }
+
+        let camRight   = nwuToRL(bodyRight)    // camera local +x  (phone right edge in world)
+        let camUp      = nwuToRL(bodyTop)      // camera local +y  (phone top edge in world)
+        let camForward = nwuToRL(bodyScreen)   // screen normal in world = view direction
+
+        // Camera looks along its local −z axis; columns of rotation matrix are
+        // [right, up, back] = [camRight, camUp, −camForward].
+        let rotMatrix = float3x3(columns: (
+            camRight,
+            camUp,
+            SIMD3<Float>(-camForward.x, -camForward.y, -camForward.z)
+        ))
+        // Slerp toward the target orientation to smooth out sensor noise.
+        // Enforce shortest-path by negating if the dot product is negative.
+        var target = simd_quatf(rotMatrix)
+        if simd_dot(filteredVROrientation.vector, target.vector) < 0 {
+            target = simd_quatf(vector: -target.vector)
+        }
+        // α ≈ 1 − exp(−dt/τ) at 60 Hz with τ = 0.12 s.
+        let alpha: Float = 0.107
+        filteredVROrientation = simd_normalize(simd_slerp(filteredVROrientation, target, alpha))
+        manualCamera.orientation = filteredVROrientation
+    }
+
     // MARK: Manual-mode camera
 
     private func installManualGestures() {
@@ -599,4 +741,38 @@ final class SkyRenderer: NSObject {
         let pitchRotation = simd_quatf(angle: manualPitch, axis: SIMD3(1, 0, 0))
         manualCamera.orientation = yawRotation * pitchRotation
     }
+}
+
+// MARK: - ARSessionDelegate
+
+extension SkyRenderer: ARSessionDelegate {
+    /// Error 102 = compass unavailable. Auto-switch to VR so the sky remains
+    /// usable (gyroscope-only orientation via NWU CMMotion reference).
+    nonisolated func session(_ session: ARSession, didFailWithError error: Error) {
+        let nsError = error as NSError
+        arLogger.error("ARSession error \(nsError.code, privacy: .public): \(error.localizedDescription, privacy: .public)")
+        guard nsError.domain == "com.apple.arkit.error", nsError.code == 102 else { return }
+        Task { @MainActor [weak self] in
+            guard let self, self.isARMode else { return }
+            self.appState.skyDisplayMode = .vr
+        }
+    }
+
+    nonisolated func sessionWasInterrupted(_ session: ARSession) { }
+
+    /// After an interruption (phone call, app switch), reset tracking so
+    /// ARKit re-acquires the gravity reference cleanly.
+    nonisolated func sessionInterruptionEnded(_ session: ARSession) {
+        Task { @MainActor [weak self] in
+            guard let self, self.isARMode else { return }
+            arLogger.notice("ARSession interruption ended — resetting tracking")
+            let configuration = ARWorldTrackingConfiguration()
+            configuration.worldAlignment = .gravity
+            configuration.planeDetection = []
+            self.arView.session.run(configuration, options: .resetTracking)
+        }
+    }
+
+    nonisolated func session(_ session: ARSession,
+                             cameraDidChangeTrackingState camera: ARCamera) { }
 }
