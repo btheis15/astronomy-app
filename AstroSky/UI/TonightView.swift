@@ -19,6 +19,8 @@ struct TonightView: View {
     @State private var moonPhase: MoonEphemeris.PhaseInfo? = nil
     @State private var moonEvents: RiseSetEvents? = nil
     @State private var planetInfos: [(planet: PlanetObject, altStr: String, isUp: Bool, magStr: String)] = []
+    @State private var telescopeTargets: [TonightTarget] = []
+    @State private var telescopeTargetsLoaded = false
 
     /// Passes ordered either by time (default) or by peak brightness.
     private var sortedPasses: [SatellitePass] {
@@ -36,9 +38,20 @@ struct TonightView: View {
                 sunSection
                 moonSection
                 planetsSection
+                telescopeSection
                 passesSection
             }
             .navigationTitle("Tonight")
+            .toolbar {
+                ToolbarItem(placement: .topBarTrailing) {
+                    NavigationLink {
+                        ObservationLogView()
+                    } label: {
+                        Image(systemName: "book.closed")
+                    }
+                    .accessibilityLabel("Observing Log")
+                }
+            }
             .refreshable {
                 await appState.satelliteService.refresh()
                 await reloadPasses()
@@ -49,6 +62,10 @@ struct TonightView: View {
                 }
                 if events.isEmpty {
                     await reloadEvents()
+                }
+                if !telescopeTargetsLoaded {
+                    telescopeTargets = await TonightPlanner.compute(appState: appState)
+                    telescopeTargetsLoaded = true
                 }
             }
             .task(id: dayKey) {
@@ -194,6 +211,53 @@ struct TonightView: View {
                     }
                 }
             }
+        }
+    }
+
+    // MARK: Telescope targets
+
+    @ViewBuilder private var telescopeSection: some View {
+        Section {
+            if !telescopeTargetsLoaded {
+                HStack {
+                    ProgressView()
+                    Text("Finding tonight's targets…").foregroundStyle(.secondary)
+                }
+            } else if telescopeTargets.isEmpty {
+                if appState.activeOptics == nil {
+                    NavigationLink { EquipmentEditorView() } label: {
+                        Label("Set up a telescope to see tonight's best targets",
+                              systemImage: "eyeglasses")
+                    }
+                }
+            } else {
+                ForEach(telescopeTargets.prefix(5)) { target in
+                    NavigationLink {
+                        ObjectDetailView(object: target.object)
+                    } label: {
+                        HStack {
+                            ObjectGlyph(object: target.object, size: 30).frame(width: 34)
+                            VStack(alignment: .leading, spacing: 2) {
+                                Text(target.object.name)
+                                Text(target.object.subtitle).font(.caption).foregroundStyle(.secondary)
+                            }
+                            Spacer()
+                            Text(target.verdict.rawValue)
+                                .font(.caption.weight(.semibold))
+                                .foregroundStyle(.secondary)
+                        }
+                    }
+                }
+                NavigationLink {
+                    ObserveTonightView()
+                } label: {
+                    Text("See all \(telescopeTargets.count) targets")
+                        .font(.subheadline)
+                        .foregroundStyle(.indigo)
+                }
+            }
+        } header: {
+            Text("Best for your telescope")
         }
     }
 

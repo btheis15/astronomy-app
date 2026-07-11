@@ -36,15 +36,6 @@ struct CatalogView: View {
                 }
 
                 Section {
-                    Label("Observing Log", systemImage: "book.closed")
-                        .tag(CatalogSelection.observingLog)
-                    Label("Solar System Orrery", systemImage: "circle.hexagongrid.fill")
-                        .tag(CatalogSelection.orrery)
-                    Label("Observe Tonight · your telescope", systemImage: "eyeglasses")
-                        .tag(CatalogSelection.observeTonight)
-                }
-
-                Section {
                     Label { Text("Solar System") } icon: { SunGlyph(size: 24) }
                         .tag(CatalogSelection.solarSystem)
                     Label { Text("Bright Stars") } icon: {
@@ -60,7 +51,18 @@ struct CatalogView: View {
                     Label { Text("Constellations") } icon: { CatalogView.constellationCategoryGlyph }
                         .tag(CatalogSelection.constellations)
                 } header: {
-                    Text("Catalog")
+                    Text("Catalogs")
+                }
+
+                Section {
+                    Label("Observing Log", systemImage: "book.closed")
+                        .tag(CatalogSelection.observingLog)
+                    Label("Orrery", systemImage: "circle.hexagongrid.fill")
+                        .tag(CatalogSelection.orrery)
+                    Label("Observe Tonight", systemImage: "eyeglasses")
+                        .tag(CatalogSelection.observeTonight)
+                } header: {
+                    Text("Tools")
                 }
 
                 Section {
