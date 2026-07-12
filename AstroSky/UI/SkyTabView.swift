@@ -14,6 +14,7 @@ struct SkyTabView: View {
     @State private var guide: GuideReadout?
     @State private var showSearch = false
     @State private var showCalibrationSheet = false
+    @State private var trackingHint: String?
 
     /// Effective display mode: honours the stored preference but falls back to
     /// VR (motion-tracked) when AR isn't available (e.g. Simulator).
@@ -24,14 +25,6 @@ struct SkyTabView: View {
         return appState.skyDisplayMode
     }
 
-    private func cycleSkyMode() {
-        let arSupported = ARWorldTrackingConfiguration.isSupported
-        switch appState.skyDisplayMode {
-        case .ar:       appState.skyDisplayMode = .vr
-        case .vr:       appState.skyDisplayMode = .freeLook
-        case .freeLook: appState.skyDisplayMode = arSupported ? .ar : .vr
-        }
-    }
     @State private var showTimeControls = false
     @State private var renderer: SkyRenderer?
     @State private var capturedPhoto: CapturedPhoto?
@@ -42,6 +35,7 @@ struct SkyTabView: View {
             SkyARViewContainer(appState: appState,
                                skyDisplayMode: effectiveMode,
                                onGuideUpdate: { guide = $0 },
+                               onTrackingHint: { trackingHint = $0 },
                                onRendererReady: { renderer = $0 })
             .id(effectiveMode)   // rebuild the view when switching modes
             .ignoresSafeArea()
@@ -76,6 +70,18 @@ struct SkyTabView: View {
     private var hud: some View {
         VStack(spacing: 0) {
             topBar
+
+            if let hint = trackingHint {
+                Text(hint)
+                    .font(.caption.weight(.semibold))
+                    .foregroundStyle(.white)
+                    .padding(.horizontal, 12)
+                    .padding(.vertical, 6)
+                    .background(.ultraThinMaterial, in: RoundedRectangle(cornerRadius: 10))
+                    .padding(.top, 4)
+                    .transition(.move(edge: .top).combined(with: .opacity))
+            }
+
             Spacer()
 
             if let guide, appState.guideTargetID != nil {
@@ -99,6 +105,7 @@ struct SkyTabView: View {
             }
         }
         .animation(.snappy, value: appState.selectedObjectID)
+        .animation(.snappy, value: trackingHint)
         .sheet(isPresented: $showSearch) {
             SearchView()
         }
@@ -174,23 +181,6 @@ struct SkyTabView: View {
         }
         .padding(.horizontal)
         .padding(.top, 4)
-    }
-
-    /// SF Symbol for the mode button — shows what you'll switch TO.
-    private var nextModeIcon: String {
-        switch effectiveMode {
-        case .ar:       return "moon.stars.fill"   // tap → VR immersive
-        case .vr:       return "move.3d"           // tap → free-look
-        case .freeLook: return ARWorldTrackingConfiguration.isSupported ? "camera.viewfinder" : "moon.stars.fill"
-        }
-    }
-
-    private var nextModeLabel: String {
-        switch effectiveMode {
-        case .ar:       return "Switch to immersive sky (no camera)"
-        case .vr:       return "Switch to free-look mode"
-        case .freeLook: return ARWorldTrackingConfiguration.isSupported ? "Switch to AR camera mode" : "Switch to immersive sky"
-        }
     }
 
     private var currentModeIcon: String {

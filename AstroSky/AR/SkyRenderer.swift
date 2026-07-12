@@ -45,6 +45,7 @@ final class SkyRenderer: NSObject {
     private var motionManager: CMMotionManager?
 
     var onGuideUpdate: ((GuideReadout?) -> Void)?
+    var onTrackingHint: ((String?) -> Void)?
 
     // Scene graph.
     private let worldAnchor = AnchorEntity(world: matrix_identity_float4x4)
@@ -86,6 +87,7 @@ final class SkyRenderer: NSObject {
     // North calibration (AR mode only).
     private let northCalibrator = NorthCalibrator()
     private var currentBaseOrientation: simd_quatf = .init(ix: 0, iy: 0, iz: 0, r: 1)
+    private var notAvailableTask: Task<Void, Never>?
 
     // VR-mode orientation smoothing.
     private var filteredVROrientation: simd_quatf = .init(ix: 0, iy: 0, iz: 0, r: 1)
@@ -758,7 +760,11 @@ extension SkyRenderer: ARSessionDelegate {
         }
     }
 
-    nonisolated func sessionWasInterrupted(_ session: ARSession) { }
+    nonisolated func sessionWasInterrupted(_ session: ARSession) {
+        Task { @MainActor [weak self] in
+            self?.onTrackingHint?("AR session interrupted")
+        }
+    }
 
     /// After an interruption (phone call, app switch), reset tracking so
     /// ARKit re-acquires the gravity reference cleanly.
@@ -775,5 +781,27 @@ extension SkyRenderer: ARSessionDelegate {
     }
 
     nonisolated func session(_ session: ARSession,
-                             cameraDidChangeTrackingState camera: ARCamera) { }
+                             cameraDidChangeTrackingState camera: ARCamera) {
+        Task { @MainActor [weak self] in
+            guard let self, self.isARMode else { return }
+            self.notAvailableTask?.cancel()
+            self.notAvailableTask = nil
+            switch camera.trackingState {
+            case .normal:
+                self.onTrackingHint?(nil)
+            case .limited:
+                self.onTrackingHint?("Tracking limited — slow down and move to better light")
+            case .notAvailable:
+                self.onTrackingHint?("Tracking unavailable — switching to gyroscope mode")
+                self.notAvailableTask = Task { [weak self] in
+                    try? await Task.sleep(for: .seconds(5))
+                    guard let self, !Task.isCancelled else { return }
+                    self.appState.skyDisplayMode = .vr
+                    self.onTrackingHint?(nil)
+                }
+            @unknown default:
+                self.onTrackingHint?(nil)
+            }
+        }
+    }
 }

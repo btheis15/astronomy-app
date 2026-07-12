@@ -59,8 +59,6 @@ struct CatalogView: View {
                         .tag(CatalogSelection.observingLog)
                     Label("Orrery", systemImage: "circle.hexagongrid.fill")
                         .tag(CatalogSelection.orrery)
-                    Label("Observe Tonight", systemImage: "eyeglasses")
-                        .tag(CatalogSelection.observeTonight)
                 } header: {
                     Text("Tools")
                 }

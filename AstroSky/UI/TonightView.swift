@@ -146,8 +146,10 @@ struct TonightView: View {
 
     private var sunSection: some View {
         Section("Sun & twilight") {
-            row("Sunrise", twilight.map { AstroFormat.time($0.sunrise) } ?? "Loading…", icon: "sunrise")
-            row("Sunset", twilight.map { AstroFormat.time($0.sunset) } ?? "Loading…", icon: "sunset")
+            row("Sunrise", twilight.map { AstroFormat.time($0.sunrise) } ?? "12:00 AM", icon: "sunrise")
+                .redacted(reason: twilight == nil ? .placeholder : [])
+            row("Sunset", twilight.map { AstroFormat.time($0.sunset) } ?? "12:00 PM", icon: "sunset")
+                .redacted(reason: twilight == nil ? .placeholder : [])
             row("Civil dusk", twilight.map { AstroFormat.time($0.civilDusk) } ?? "—", icon: "sun.horizon")
             row("Astronomical dusk", twilight.map { AstroFormat.time($0.astronomicalDusk) } ?? "—", icon: "moon.haze")
             row("Astronomical dawn", twilight.map { AstroFormat.time($0.astronomicalDawn) } ?? "—", icon: "moon.haze.fill")

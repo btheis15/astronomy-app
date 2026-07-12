@@ -46,6 +46,9 @@ final class NorthCalibrator {
     private let maxSlewPerSecond: Float = .pi / 90 // 2°/s
     /// Reject compass readings coarser than this.
     private let maxAccuracyDeg: Double = 30
+    /// Skip samples when the camera pitch exceeds this (pointing near-zenith).
+    /// sin(65°) ≈ 0.906 — precomputed to avoid trig on every frame.
+    private let zenithGateSinPitch: Double = 0.906  // sin(65°)
 
     // MARK: State
 
@@ -107,6 +110,12 @@ final class NorthCalibrator {
         let col2 = cameraTransform.columns.2
         let fwdX = -col2.x
         let fwdZ = -col2.z
+
+        // Pitch gate: skip when camera points within 25° of zenith.
+        // fwdY ≈ sin(cameraPitch) for a unit forward vector (+Y = up in ARKit gravity mode).
+        let fwdY = Double(-col2.y)
+        guard abs(fwdY) < zenithGateSinPitch else { return }
+
         // Azimuth in ARKit world frame: 0 = world −Z, π/2 = world +X.
         let arkitAzRad = Double(atan2(fwdX, -fwdZ))
 
