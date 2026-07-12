@@ -31,12 +31,22 @@ struct PassDetailView: View {
     @State private var passData: PassData = PassData(samples: [], startCompass: "—",
                                                      endCompass: "—", rangeAtPeakKm: nil)
 
-    /// Stable key: the pass identity never changes, so we compute exactly once.
-    private var passKey: String {
-        "\(pass.satelliteID)|\(pass.start.timeIntervalSince1970)"
+    /// Re-runs whenever the pass changes OR TLE data becomes available.
+    private var taskKey: String {
+        "\(pass.satelliteID)|\(pass.start.timeIntervalSince1970)|\(satellite != nil)"
     }
 
     var body: some View {
+        if satellite == nil && passData.samples.isEmpty {
+            ContentUnavailableView {
+                Label("TLE Data Unavailable", systemImage: "satellite")
+            } description: {
+                Text("Orbital data for this satellite hasn't loaded yet. Check back shortly.")
+            }
+            .navigationTitle(pass.satelliteName)
+            .navigationBarTitleDisplayMode(.inline)
+            .task(id: taskKey) { }   // triggers re-evaluation when satellite loads
+        } else {
         List {
             Section {
                 PassSkyChart(samples: passData.samples,
@@ -74,8 +84,8 @@ struct PassDetailView: View {
                 }
             }
         }
-        // Compute all SGP4-derived data once (the pass is immutable).
-        .task(id: passKey) {
+        // Compute all SGP4-derived data; re-runs if TLE data loads after initial display.
+        .task(id: taskKey) {
             guard let satellite else { return }
             let observer = appState.observer
             let passStart = pass.start
@@ -120,6 +130,7 @@ struct PassDetailView: View {
                                 rangeAtPeakKm: rangeAtPeakKm)
             }.value
         }
+        } // end else
     }
 
     private var durationString: String {

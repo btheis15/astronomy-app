@@ -34,6 +34,7 @@ struct TonightView: View {
     var body: some View {
         NavigationStack {
             List {
+                summarySection
                 eventsSection
                 sunSection
                 moonSection
@@ -102,6 +103,61 @@ struct TonightView: View {
                         magStr: AstroFormat.magnitude(pos.magnitude)
                     )
                 }
+            }
+        }
+    }
+
+    // MARK: Summary card
+
+    private var summarySection: some View {
+        Section("Tonight at a glance") {
+            row("Dark sky",
+                "\(twilight.map { AstroFormat.time($0.astronomicalDusk) } ?? "—") – \(twilight.map { AstroFormat.time($0.astronomicalDawn) } ?? "—")",
+                icon: "moon.stars")
+                .redacted(reason: twilight == nil ? .placeholder : [])
+
+            HStack {
+                Label("Moon", systemImage: "moon").foregroundStyle(.secondary)
+                Spacer()
+                if let phase = moonPhase {
+                    VStack(alignment: .trailing, spacing: 1) {
+                        Text("\(Int((phase.illuminatedFraction * 100).rounded()))% illuminated")
+                            .font(.subheadline.weight(.medium))
+                        if moonEvents != nil {
+                            Text("Sets \(moonEvents.map { AstroFormat.time($0.set) } ?? "—")")
+                                .font(.caption).foregroundStyle(.secondary)
+                        }
+                    }
+                } else {
+                    Text("—")
+                        .redacted(reason: .placeholder)
+                }
+            }
+            .font(.subheadline)
+
+            if telescopeTargetsLoaded {
+                if let top = telescopeTargets.first {
+                    NavigationLink {
+                        ObjectDetailView(object: top.object)
+                    } label: {
+                        HStack {
+                            Label("Top pick", systemImage: "sparkles").foregroundStyle(.secondary)
+                            Spacer()
+                            Text(top.object.name).font(.subheadline.weight(.semibold))
+                            Text(top.verdict.rawValue)
+                                .font(.caption).foregroundStyle(.secondary)
+                                .padding(.leading, 2)
+                        }
+                        .font(.subheadline)
+                    }
+                }
+            } else {
+                HStack {
+                    Label("Top pick", systemImage: "sparkles").foregroundStyle(.secondary)
+                    Spacer()
+                    ProgressView().scaleEffect(0.75)
+                }
+                .font(.subheadline)
             }
         }
     }

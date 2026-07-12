@@ -132,7 +132,38 @@ struct ObjectDetailView: View {
                         .background(.quaternary, in: Capsule())
                 }
             }
+            if let pos = cachedPosition {
+                verdictChips(pos)
+            }
         }
+    }
+
+    private func verdictChips(_ pos: SkyPosition) -> some View {
+        let up = pos.horizontal.isAboveHorizon
+        return ScrollView(.horizontal, showsIndicators: false) {
+            HStack(spacing: 8) {
+                Label(up ? "Up now" : "Below horizon",
+                      systemImage: up ? "eye" : "eye.slash")
+                    .font(.caption.weight(.semibold))
+                    .foregroundStyle(up ? .green : .secondary)
+                    .padding(.horizontal, 10).padding(.vertical, 5)
+                    .background(up ? Color.green.opacity(0.15) : Color.secondary.opacity(0.12),
+                                in: Capsule())
+                verdictChip(AstroFormat.degrees(pos.horizontal.altitude),
+                            icon: "arrow.up.right")
+                verdictChip(pos.horizontal.compassDirection,
+                            icon: "location.north.line")
+            }
+        }
+        .listRowInsets(EdgeInsets(top: 0, leading: 16, bottom: 6, trailing: 16))
+    }
+
+    private func verdictChip(_ text: String, icon: String) -> some View {
+        Label(text, systemImage: icon)
+            .font(.caption.weight(.medium))
+            .foregroundStyle(.secondary)
+            .padding(.horizontal, 10).padding(.vertical, 5)
+            .background(.quaternary, in: Capsule())
     }
 
     private var positionSection: some View {

@@ -112,75 +112,83 @@ struct SkyTabView: View {
     }
 
     private var topBar: some View {
-        HStack(spacing: 12) {
-            locationBadge
-
-            if let accuracy = appState.locationService.headingAccuracy {
-                headingChip(accuracy: accuracy)
+        ViewThatFits(in: .horizontal) {
+            HStack(spacing: 12) {
+                topBarLeading
+                Spacer()
+                topBarTrailing
             }
-
-            Spacer()
-
-            if appState.hasAlignmentOffset {
-                hudButton(systemImage: "arrow.counterclockwise", label: "Reset sky alignment") {
-                    withAnimation(.snappy) { appState.resetAlignment() }
-                }
-            }
-
-            if !appState.isLiveTime {
-                Button {
-                    appState.resetToLiveTime()
-                } label: {
-                    Label("Live", systemImage: "clock.arrow.circlepath")
-                        .font(.footnote.weight(.semibold))
-                }
-                .buttonStyle(.borderedProminent)
-                .tint(.orange)
-            }
-
-            hudButton(systemImage: "clock", label: "Time travel controls") {
-                showTimeControls.toggle()
-            }
-            // Mode menu: shows the current mode icon and lists all three options.
-            Menu {
-                Button {
-                    appState.skyDisplayMode = .ar
-                } label: {
-                    if effectiveMode == .ar { Label("AR Camera", systemImage: "checkmark") }
-                    else { Text("AR Camera") }
-                }
-                .disabled(!ARWorldTrackingConfiguration.isSupported)
-
-                Button {
-                    appState.skyDisplayMode = .vr
-                } label: {
-                    if effectiveMode == .vr { Label("Immersive (gyroscope)", systemImage: "checkmark") }
-                    else { Text("Immersive (gyroscope)") }
-                }
-
-                Button {
-                    appState.skyDisplayMode = .freeLook
-                } label: {
-                    if effectiveMode == .freeLook { Label("Free-look (drag)", systemImage: "checkmark") }
-                    else { Text("Free-look (drag)") }
-                }
-            } label: {
-                Image(systemName: currentModeIcon)
-                    .font(.system(size: 17, weight: .medium))
-                    .frame(width: 40, height: 40)
-                    .background(.ultraThinMaterial, in: Circle())
-            }
-            .accessibilityLabel("Sky view mode")
-
-            hudButton(systemImage: isCapturing ? "camera.fill" : "camera", label: "Take photo") {
-                capturePhoto()
-            }
-            hudButton(systemImage: "magnifyingglass", label: "Search the sky") {
-                showSearch = true
+            VStack(alignment: .trailing, spacing: 6) {
+                HStack(spacing: 8) { topBarLeading; Spacer() }
+                HStack(spacing: 8) { topBarTrailing }
             }
         }
         .padding(.horizontal)
         .padding(.top, 4)
+    }
+
+    @ViewBuilder private var topBarLeading: some View {
+        locationBadge
+        if let accuracy = appState.locationService.headingAccuracy {
+            headingChip(accuracy: accuracy)
+        }
+    }
+
+    @ViewBuilder private var topBarTrailing: some View {
+        if appState.hasAlignmentOffset {
+            hudButton(systemImage: "arrow.counterclockwise", label: "Reset sky alignment") {
+                withAnimation(.snappy) { appState.resetAlignment() }
+            }
+        }
+        if !appState.isLiveTime {
+            Button {
+                appState.resetToLiveTime()
+            } label: {
+                Label("Live", systemImage: "clock.arrow.circlepath")
+                    .font(.footnote.weight(.semibold))
+            }
+            .buttonStyle(.borderedProminent)
+            .tint(.orange)
+        }
+        hudButton(systemImage: "clock", label: "Time travel controls") {
+            showTimeControls.toggle()
+        }
+        // Mode menu: shows the current mode icon and lists all three options.
+        Menu {
+            Button {
+                appState.skyDisplayMode = .ar
+            } label: {
+                if effectiveMode == .ar { Label("AR Camera", systemImage: "checkmark") }
+                else { Text("AR Camera") }
+            }
+            .disabled(!ARWorldTrackingConfiguration.isSupported)
+
+            Button {
+                appState.skyDisplayMode = .vr
+            } label: {
+                if effectiveMode == .vr { Label("Immersive (gyroscope)", systemImage: "checkmark") }
+                else { Text("Immersive (gyroscope)") }
+            }
+
+            Button {
+                appState.skyDisplayMode = .freeLook
+            } label: {
+                if effectiveMode == .freeLook { Label("Free-look (drag)", systemImage: "checkmark") }
+                else { Text("Free-look (drag)") }
+            }
+        } label: {
+            Image(systemName: currentModeIcon)
+                .font(.system(size: 17, weight: .medium))
+                .frame(width: 40, height: 40)
+                .background(.ultraThinMaterial, in: Circle())
+        }
+        .accessibilityLabel("Sky view mode")
+        hudButton(systemImage: isCapturing ? "camera.fill" : "camera", label: "Take photo") {
+            capturePhoto()
+        }
+        hudButton(systemImage: "magnifyingglass", label: "Search the sky") {
+            showSearch = true
+        }
     }
 
     private var currentModeIcon: String {

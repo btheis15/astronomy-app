@@ -22,6 +22,8 @@ enum CatalogSelection: Hashable {
 struct CatalogView: View {
     @Environment(AppState.self) private var appState
     @State private var selection: CatalogSelection?
+    @State private var searchQuery = ""
+    @State private var searchResults: [any CelestialObject] = []
 
     var body: some View {
         NavigationSplitView {
@@ -75,11 +77,15 @@ struct CatalogView: View {
                 }
             }
             .navigationTitle("Catalog")
+            .searchable(text: $searchQuery, prompt: "Search catalog…")
+            .onChange(of: searchQuery) { _, query in
+                searchResults = query.isEmpty ? [] : Array(appState.search(query).prefix(100))
+            }
         } detail: {
             NavigationStack {
                 detailView
             }
-            .id(selection)
+            .id(searchQuery.isEmpty ? AnyHashable(selection) : AnyHashable(searchQuery))
         }
     }
 
@@ -87,6 +93,9 @@ struct CatalogView: View {
     /// view-based `NavigationLink`s, which push within this detail stack.
     @ViewBuilder
     private var detailView: some View {
+        if !searchQuery.isEmpty {
+            searchResultsView
+        } else {
         switch selection {
         case .favorite(let id):
             if let object = appState.favoriteObjects.first(where: { $0.id == id }) {
@@ -117,6 +126,35 @@ struct CatalogView: View {
                            objects: appState.satelliteService.starlinkForDisplay)
         case nil:
             catalogPlaceholder
+        }
+        } // end search-active else
+    }
+
+    private var searchResultsView: some View {
+        List {
+            ForEach(searchResults, id: \.id) { object in
+                NavigationLink {
+                    ObjectDetailView(object: object)
+                } label: {
+                    CatalogRow(object: object)
+                }
+                .swipeActions(edge: .trailing) {
+                    Button {
+                        appState.select(object)
+                        appState.guideTargetID = object.id
+                        appState.skyTabRequested = true
+                    } label: {
+                        Label("Find in AR", systemImage: "arkit")
+                    }
+                    .tint(.indigo)
+                }
+            }
+        }
+        .navigationTitle("Results")
+        .overlay {
+            if searchResults.isEmpty {
+                ContentUnavailableView.search(text: searchQuery)
+            }
         }
     }
 
