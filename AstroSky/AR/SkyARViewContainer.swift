@@ -12,6 +12,7 @@ struct SkyARViewContainer: UIViewRepresentable {
     let appState: AppState
     var skyDisplayMode: SkyDisplayMode
     var onGuideUpdate: (GuideReadout?) -> Void
+    var onTrackingHint: ((String?) -> Void)?
     /// Hands the live renderer back to SwiftUI (for the shutter button).
     var onRendererReady: (SkyRenderer) -> Void = { _ in }
 
@@ -22,12 +23,14 @@ struct SkyARViewContainer: UIViewRepresentable {
     func makeUIView(context: Context) -> ARView {
         let renderer = context.coordinator.renderer
         renderer.onGuideUpdate = onGuideUpdate
+        renderer.onTrackingHint = onTrackingHint
         onRendererReady(renderer)
         return renderer.arView
     }
 
     func updateUIView(_ uiView: ARView, context: Context) {
         context.coordinator.renderer.onGuideUpdate = onGuideUpdate
+        context.coordinator.renderer.onTrackingHint = onTrackingHint
     }
 
     static func dismantleUIView(_ uiView: ARView, coordinator: Coordinator) {

@@ -52,9 +52,8 @@ struct OnboardingView: View {
                     actionTitle: "Enable Location",
                     action: {
                         appState.locationService.requestLocation()
-                        // Give the location manager a brief moment to receive the response
-                        try? await Task.sleep(for: .milliseconds(500))
-                        let status = appState.locationService.authorizationStatus
+                        // Observe until CLLocationManager fires its delegate callback
+                        let status = await waitForLocationAuth(appState.locationService)
                         if status == .denied || status == .restricted {
                             locationDenied = true
                         } else {
@@ -110,6 +109,17 @@ struct OnboardingView: View {
     private func requestCamera() async {
         _ = await AVCaptureDevice.requestAccess(for: .video)
     }
+}
+
+/// Polls every 100 ms until `service.authorizationStatus` leaves
+/// `.notDetermined` (i.e. the user has responded to the system dialog).
+/// Polling is fine here — the user takes at least several hundred ms to tap.
+@MainActor
+private func waitForLocationAuth(_ service: LocationService) async -> CLAuthorizationStatus {
+    while service.authorizationStatus == .notDetermined {
+        try? await Task.sleep(for: .milliseconds(100))
+    }
+    return service.authorizationStatus
 }
 
 private struct OnboardingPage: View {

@@ -18,9 +18,10 @@ struct TonightView: View {
     @State private var twilight: TwilightTimes? = nil
     @State private var moonPhase: MoonEphemeris.PhaseInfo? = nil
     @State private var moonEvents: RiseSetEvents? = nil
-    @State private var planetInfos: [(planet: PlanetObject, altStr: String, isUp: Bool, magStr: String)] = []
+    @State private var planetInfos: [PlanetInfo] = []
     @State private var telescopeTargets: [TonightTarget] = []
     @State private var telescopeTargetsLoaded = false
+    @State private var sessionLogObjectID: String? = nil
 
     /// Passes ordered either by time (default) or by peak brightness.
     private var sortedPasses: [SatellitePass] {
@@ -34,6 +35,8 @@ struct TonightView: View {
     var body: some View {
         NavigationStack {
             List {
+                summarySection
+                sessionSection
                 eventsSection
                 sunSection
                 moonSection
@@ -55,6 +58,15 @@ struct TonightView: View {
             .refreshable {
                 await appState.satelliteService.refresh()
                 await reloadPasses()
+            }
+            .sheet(isPresented: Binding(
+                get: { sessionLogObjectID != nil },
+                set: { if !$0 { sessionLogObjectID = nil } }
+            )) {
+                if let id = sessionLogObjectID, let obj = appState.object(withID: id) {
+                    LogObservationSheet(object: obj)
+                        .nightModeAware()
+                }
             }
             .task {
                 if !passesLoaded {
@@ -95,9 +107,104 @@ struct TonightView: View {
                 planetInfos = appState.catalog.planets.map { planet in
                     let pos = PlanetEphemeris.position(of: planet.planet, julianDate: jd)
                     let h = planet.horizontal(julianDate: jd, observer: obs)
-                    return (planet, AstroFormat.degrees(h.altitude) + " · " + h.compassDirection,
-                            h.isAboveHorizon, AstroFormat.magnitude(pos.magnitude))
+                    return PlanetInfo(
+                        planet: planet,
+                        altStr: AstroFormat.degrees(h.altitude) + " · " + h.compassDirection,
+                        isUp: h.isAboveHorizon,
+                        magStr: AstroFormat.magnitude(pos.magnitude)
+                    )
                 }
+            }
+        }
+    }
+
+    // MARK: Summary card
+
+    private var summarySection: some View {
+        Section("Tonight at a glance") {
+            row("Dark sky",
+                "\(twilight.map { AstroFormat.time($0.astronomicalDusk) } ?? "—") – \(twilight.map { AstroFormat.time($0.astronomicalDawn) } ?? "—")",
+                icon: "moon.stars")
+                .redacted(reason: twilight == nil ? .placeholder : [])
+
+            HStack {
+                Label("Moon", systemImage: "moon").foregroundStyle(.secondary)
+                Spacer()
+                if let phase = moonPhase {
+                    VStack(alignment: .trailing, spacing: 1) {
+                        Text("\(Int((phase.illuminatedFraction * 100).rounded()))% illuminated")
+                            .font(.subheadline.weight(.medium))
+                        if moonEvents != nil {
+                            Text("Sets \(moonEvents.map { AstroFormat.time($0.set) } ?? "—")")
+                                .font(.caption).foregroundStyle(.secondary)
+                        }
+                    }
+                } else {
+                    Text("—")
+                        .redacted(reason: .placeholder)
+                }
+            }
+            .font(.subheadline)
+
+            if telescopeTargetsLoaded {
+                if let top = telescopeTargets.first {
+                    NavigationLink {
+                        ObjectDetailView(object: top.object)
+                    } label: {
+                        HStack {
+                            Label("Top pick", systemImage: "sparkles").foregroundStyle(.secondary)
+                            Spacer()
+                            Text(top.object.name).font(.subheadline.weight(.semibold))
+                            Text(top.verdict.rawValue)
+                                .font(.caption).foregroundStyle(.secondary)
+                                .padding(.leading, 2)
+                        }
+                        .font(.subheadline)
+                    }
+                }
+            } else {
+                HStack {
+                    Label("Top pick", systemImage: "sparkles").foregroundStyle(.secondary)
+                    Spacer()
+                    ProgressView().scaleEffect(0.75)
+                }
+                .font(.subheadline)
+            }
+        }
+    }
+
+    // MARK: Session plan
+
+    @ViewBuilder private var sessionSection: some View {
+        let queueObjects = appState.sessionQueue.compactMap { appState.object(withID: $0) }
+        if !queueObjects.isEmpty {
+            Section {
+                ForEach(queueObjects, id: \.id) { obj in
+                    HStack(spacing: 12) {
+                        ObjectGlyph(object: obj, size: 28).frame(width: 32)
+                        VStack(alignment: .leading, spacing: 2) {
+                            Text(obj.name)
+                            Text(obj.subtitle).font(.caption).foregroundStyle(.secondary)
+                        }
+                        Spacer()
+                        Button {
+                            sessionLogObjectID = obj.id
+                        } label: {
+                            Image(systemName: "checkmark.circle")
+                                .font(.title3)
+                                .foregroundStyle(.indigo)
+                        }
+                        .buttonStyle(.plain)
+                        .accessibilityLabel("Log observation for \(obj.name)")
+                    }
+                }
+                .onDelete { offsets in
+                    offsets.map { queueObjects[$0].id }.forEach { appState.removeFromSessionQueue($0) }
+                }
+            } header: {
+                Text("Tonight's plan")
+            } footer: {
+                Text("Tap ✓ to log an observation and remove it from your plan. Swipe to delete.")
             }
         }
     }
@@ -108,18 +215,22 @@ struct TonightView: View {
         if !events.isEmpty {
             Section("Sky events · next 30 days") {
                 ForEach(events.prefix(8)) { event in
-                    HStack(spacing: 12) {
-                        Image(systemName: event.kind.iconSystemName)
-                            .foregroundStyle(.yellow)
-                            .frame(width: 28)
-                        VStack(alignment: .leading, spacing: 2) {
-                            Text(event.title)
-                            Text(event.detail).font(.caption).foregroundStyle(.secondary)
+                    NavigationLink {
+                        EventDetailView(event: event)
+                    } label: {
+                        HStack(spacing: 12) {
+                            Image(systemName: event.kind.iconSystemName)
+                                .foregroundStyle(.yellow)
+                                .frame(width: 28)
+                            VStack(alignment: .leading, spacing: 2) {
+                                Text(event.title)
+                                Text(event.detail).font(.caption).foregroundStyle(.secondary)
+                            }
+                            Spacer()
+                            Text(event.date.formatted(.dateTime.month().day()))
+                                .font(.caption.monospacedDigit())
+                                .foregroundStyle(.secondary)
                         }
-                        Spacer()
-                        Text(event.date.formatted(.dateTime.month().day()))
-                            .font(.caption.monospacedDigit())
-                            .foregroundStyle(.secondary)
                     }
                 }
             }
@@ -146,8 +257,10 @@ struct TonightView: View {
 
     private var sunSection: some View {
         Section("Sun & twilight") {
-            row("Sunrise", twilight.map { AstroFormat.time($0.sunrise) } ?? "Loading…", icon: "sunrise")
-            row("Sunset", twilight.map { AstroFormat.time($0.sunset) } ?? "Loading…", icon: "sunset")
+            row("Sunrise", twilight.map { AstroFormat.time($0.sunrise) } ?? "12:00 AM", icon: "sunrise")
+                .redacted(reason: twilight == nil ? .placeholder : [])
+            row("Sunset", twilight.map { AstroFormat.time($0.sunset) } ?? "12:00 PM", icon: "sunset")
+                .redacted(reason: twilight == nil ? .placeholder : [])
             row("Civil dusk", twilight.map { AstroFormat.time($0.civilDusk) } ?? "—", icon: "sun.horizon")
             row("Astronomical dusk", twilight.map { AstroFormat.time($0.astronomicalDusk) } ?? "—", icon: "moon.haze")
             row("Astronomical dawn", twilight.map { AstroFormat.time($0.astronomicalDawn) } ?? "—", icon: "moon.haze.fill")
@@ -257,7 +370,7 @@ struct TonightView: View {
                 }
             }
         } header: {
-            Text("Best for your telescope")
+            Text(appState.activeOptics != nil ? "Best for your telescope" : "Highlights tonight")
         }
     }
 
@@ -311,7 +424,14 @@ struct TonightView: View {
                 SatelliteGlyph(size: 30)
                     .frame(width: 34)
                 VStack(alignment: .leading, spacing: 2) {
-                    Text(pass.satelliteName).foregroundStyle(.primary)
+                    HStack(spacing: 6) {
+                        Text(pass.satelliteName).foregroundStyle(.primary)
+                        if pass.start > Date() {
+                            Text(pass.start, style: .relative)
+                                .font(.caption.weight(.semibold))
+                                .foregroundStyle(.indigo)
+                        }
+                    }
                     Text("\(AstroFormat.time(pass.start)) → \(AstroFormat.time(pass.end))")
                         .font(.caption)
                         .foregroundStyle(.secondary)
@@ -377,6 +497,15 @@ struct TonightView: View {
         }
         .font(.subheadline)
     }
+}
+
+// MARK: - Supporting types
+
+private struct PlanetInfo {
+    let planet: PlanetObject
+    let altStr: String
+    let isUp: Bool
+    let magStr: String
 }
 
 // MARK: - Moon phase drawing

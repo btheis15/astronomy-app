@@ -12,6 +12,7 @@ import SwiftUI
 
 struct OrreryView: View {
     @Environment(AppState.self) private var appState
+    private let secondsPerDay: TimeInterval = 86_400
     /// Bumped once after the view is on screen to force RealityKit to draw its
     /// first frame — a `.nonAR` ARView otherwise stays black until interacted with.
     @State private var renderTick = 0
@@ -30,7 +31,7 @@ struct OrreryView: View {
                 }
                 HStack {
                     Text("−1y").font(.caption2)
-                    Slider(value: $appState.timeOffset, in: -365 * 86_400...365 * 86_400, step: 86_400)
+                    Slider(value: $appState.timeOffset, in: -365 * secondsPerDay...365 * secondsPerDay, step: secondsPerDay)
                     Text("+1y").font(.caption2)
                 }
                 Button("Today") { appState.resetToLiveTime() }

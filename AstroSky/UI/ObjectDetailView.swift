@@ -27,8 +27,9 @@ struct ObjectDetailView: View {
     /// Cached info rows — recomputed only every ~5 s of real time.
     @State private var cachedInfoRows: [(label: String, value: String)] = []
 
-    /// Changes roughly every 5 s of simulated sky time (17280 ticks per day).
-    private var positionKey: Int { Int(appState.skyJulianDate * 17280) }
+    /// 17280 = 86400 s/day ÷ 5 s/tick: changes roughly every 5 s of sky time.
+    private static let jdTicksPerDay: Double = 17_280
+    private var positionKey: Int { Int(appState.skyJulianDate * Self.jdTicksPerDay) }
 
     /// Changes when the calendar day (or observer location) changes.
     private var dayKey: String {
@@ -66,6 +67,20 @@ struct ObjectDetailView: View {
                         .foregroundStyle(appState.favorites.isFavorite(object.id) ? .yellow : .secondary)
                 }
             }
+            ToolbarItem(placement: .topBarTrailing) {
+                let inQueue = appState.isInSessionQueue(object.id)
+                Button {
+                    if inQueue {
+                        appState.removeFromSessionQueue(object.id)
+                    } else {
+                        appState.addToSessionQueue(object.id)
+                    }
+                } label: {
+                    Image(systemName: inQueue ? "list.bullet.circle.fill" : "list.bullet.circle")
+                        .foregroundStyle(inQueue ? .indigo : .secondary)
+                }
+                .accessibilityLabel(inQueue ? "Remove from tonight's plan" : "Add to tonight's plan")
+            }
             ToolbarItem(placement: .primaryAction) {
                 Button {
                     appState.select(object)
@@ -79,6 +94,7 @@ struct ObjectDetailView: View {
         }
         .sheet(isPresented: $showLogSheet) {
             LogObservationSheet(object: object)
+                .nightModeAware()
         }
         // Recompute position and info rows every ~5 s of sky time.
         .task(id: positionKey) {
@@ -131,7 +147,38 @@ struct ObjectDetailView: View {
                         .background(.quaternary, in: Capsule())
                 }
             }
+            if let pos = cachedPosition {
+                verdictChips(pos)
+            }
         }
+    }
+
+    private func verdictChips(_ pos: SkyPosition) -> some View {
+        let up = pos.horizontal.isAboveHorizon
+        return ScrollView(.horizontal, showsIndicators: false) {
+            HStack(spacing: 8) {
+                Label(up ? "Up now" : "Below horizon",
+                      systemImage: up ? "eye" : "eye.slash")
+                    .font(.caption.weight(.semibold))
+                    .foregroundStyle(up ? .green : .secondary)
+                    .padding(.horizontal, 10).padding(.vertical, 5)
+                    .background(up ? Color.green.opacity(0.15) : Color.secondary.opacity(0.12),
+                                in: Capsule())
+                verdictChip(AstroFormat.degrees(pos.horizontal.altitude),
+                            icon: "arrow.up.right")
+                verdictChip(pos.horizontal.compassDirection,
+                            icon: "location.north.line")
+            }
+        }
+        .listRowInsets(EdgeInsets(top: 0, leading: 16, bottom: 6, trailing: 16))
+    }
+
+    private func verdictChip(_ text: String, icon: String) -> some View {
+        Label(text, systemImage: icon)
+            .font(.caption.weight(.medium))
+            .foregroundStyle(.secondary)
+            .padding(.horizontal, 10).padding(.vertical, 5)
+            .background(.quaternary, in: Capsule())
     }
 
     private var positionSection: some View {

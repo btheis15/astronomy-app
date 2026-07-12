@@ -9,6 +9,7 @@
 
 import SwiftData
 import SwiftUI
+import UniformTypeIdentifiers
 
 struct ObservationLogView: View {
     @Query(sort: \ObservationLogEntry.date, order: .reverse) private var entries: [ObservationLogEntry]
@@ -19,14 +20,16 @@ struct ObservationLogView: View {
         Set(entries.filter(\.isMessier).map(\.objectID)).count
     }
 
-    private var csvContent: String {
+    private var csvFile: ObservingLogCSV {
         var lines = ["Date,Object,Seeing (1-5),Notes"]
         for entry in entries {
             let dateStr = entry.date.formatted(date: .abbreviated, time: .shortened)
             let notes = entry.notes.replacingOccurrences(of: "\"", with: "\"\"")
             lines.append("\"\(dateStr)\",\"\(entry.objectName)\",\(entry.seeingRating),\"\(notes)\"")
         }
-        return lines.joined(separator: "\n")
+        let datestamp = Date().formatted(.iso8601.year().month().day())
+        return ObservingLogCSV(content: lines.joined(separator: "\n"),
+                               filename: "AstroSky-log-\(datestamp).csv")
     }
 
     var body: some View {
@@ -76,7 +79,7 @@ struct ObservationLogView: View {
             if !entries.isEmpty {
                 ToolbarItem(placement: .navigationBarTrailing) {
                     ShareLink(
-                        item: csvContent,
+                        item: csvFile,
                         preview: SharePreview("Observing Log", image: Image(systemName: "list.star"))
                     )
                 }
@@ -84,6 +87,7 @@ struct ObservationLogView: View {
         }
         .sheet(item: $editingEntry) { entry in
             EditObservationSheet(entry: entry)
+                .nightModeAware()
         }
     }
 }
@@ -223,5 +227,23 @@ struct LogObservationSheet: View {
                                         isMessier: isMessier)
         context.insert(entry)
         dismiss()
+    }
+}
+
+// MARK: - CSV export
+
+/// A named .csv file that recipients receive as an attachment rather than
+/// pasted text. Conforms to Transferable via FileRepresentation.
+struct ObservingLogCSV: Transferable {
+    let content: String
+    let filename: String
+
+    static var transferRepresentation: some TransferRepresentation {
+        FileRepresentation(exportedContentType: .commaSeparatedText) { csv in
+            let url = FileManager.default.temporaryDirectory
+                .appendingPathComponent(csv.filename)
+            try csv.content.write(to: url, atomically: true, encoding: .utf8)
+            return SentTransferredFile(url)
+        }
     }
 }

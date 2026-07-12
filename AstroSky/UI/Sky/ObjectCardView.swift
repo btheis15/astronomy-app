@@ -44,6 +44,14 @@ struct ObjectCardView: View {
                 } label: {
                     Image(systemName: "info.circle").font(.title3)
                 }
+                if appState.skyDisplayMode == .ar {
+                    Button {
+                        appState.alignToSelectedRequested = true
+                    } label: {
+                        Image(systemName: "scope").font(.title3)
+                    }
+                    .accessibilityLabel("Align sky to this object")
+                }
                 Button {
                     appState.select(nil)
                 } label: {
@@ -58,6 +66,7 @@ struct ObjectCardView: View {
             NavigationStack {
                 ObjectDetailView(object: object)
             }
+            .nightModeAware()
         }
         .task(id: positionKey) {
             let pos = object.skyPosition(julianDate: appState.skyJulianDate,

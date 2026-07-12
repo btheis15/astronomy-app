@@ -11,6 +11,7 @@ import RealityKit
 import UIKit
 import simd
 
+@MainActor
 enum ScaleModelTexture {
     static func texture(for body: ScaleBody) -> TextureResource? {
         if let key = body.textureKey, let cgImage = bundledImage(named: key) {
