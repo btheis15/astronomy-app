@@ -106,7 +106,6 @@ struct EquipmentEditorView: View {
 
 private struct AddTelescopeSheet: View {
     @Environment(AppState.self) private var appState
-    @Environment(\.dismiss) private var dismiss
     @State private var name = ""
     @State private var focal = ""
     @State private var aperture = ""
@@ -116,40 +115,27 @@ private struct AddTelescopeSheet: View {
     }
 
     var body: some View {
-        NavigationStack {
-            Form {
-                Section("Start from a preset") {
-                    ForEach(EquipmentHelp.telescopePresets) { preset in
-                        Button(preset.name) {
-                            name = preset.name
-                            focal = preset.focalLengthMM.formatted(.number.grouping(.never).precision(.fractionLength(0...2)))
-                            aperture = preset.apertureMM.formatted(.number.grouping(.never).precision(.fractionLength(0...2)))
-                        }
+        AddEquipmentSheet(title: "Add Telescope", isValid: valid) {
+            appState.equipment.addTelescope(Telescope(name: name,
+                                            focalLengthMM: Double(focal) ?? 0,
+                                            apertureMM: Double(aperture) ?? 0))
+        } content: {
+            Section("Start from a preset") {
+                ForEach(EquipmentHelp.telescopePresets) { preset in
+                    Button(preset.name) {
+                        name = preset.name
+                        focal = preset.focalLengthMM.formatted(.number.grouping(.never).precision(.fractionLength(0...2)))
+                        aperture = preset.apertureMM.formatted(.number.grouping(.never).precision(.fractionLength(0...2)))
                     }
                 }
-                Section {
-                    TextField("Name (e.g. My Dobsonian)", text: $name)
-                } header: { Text("Name") }
-                Section {
-                    TextField("Focal length (mm)", text: $focal).keyboardType(.decimalPad)
-                } footer: { Text(EquipmentHelp.scopeFocalLength) }
-                Section {
-                    TextField("Aperture (mm)", text: $aperture).keyboardType(.decimalPad)
-                } footer: { Text(EquipmentHelp.aperture) }
             }
-            .navigationTitle("Add Telescope")
-            .navigationBarTitleDisplayMode(.inline)
-            .toolbar {
-                ToolbarItem(placement: .cancellationAction) { Button("Cancel") { dismiss() } }
-                ToolbarItem(placement: .confirmationAction) {
-                    Button("Save") {
-                        appState.equipment.addTelescope(Telescope(name: name,
-                                                        focalLengthMM: Double(focal) ?? 0,
-                                                        apertureMM: Double(aperture) ?? 0))
-                        dismiss()
-                    }.disabled(!valid)
-                }
-            }
+            Section { TextField("Name (e.g. My Dobsonian)", text: $name) } header: { Text("Name") }
+            Section {
+                TextField("Focal length (mm)", text: $focal).keyboardType(.decimalPad)
+            } footer: { Text(EquipmentHelp.scopeFocalLength) }
+            Section {
+                TextField("Aperture (mm)", text: $aperture).keyboardType(.decimalPad)
+            } footer: { Text(EquipmentHelp.aperture) }
         }
     }
 }
@@ -158,7 +144,6 @@ private struct AddTelescopeSheet: View {
 
 private struct AddEyepieceSheet: View {
     @Environment(AppState.self) private var appState
-    @Environment(\.dismiss) private var dismiss
     @State private var name = ""
     @State private var focal = ""
     @State private var afov = "52"
@@ -174,43 +159,65 @@ private struct AddEyepieceSheet: View {
     }
 
     var body: some View {
-        NavigationStack {
-            Form {
-                Section("Start from a preset") {
-                    ForEach(EquipmentHelp.eyepiecePresets) { preset in
-                        Button(preset.name) {
-                            name = preset.name
-                            focal = preset.focalLengthMM.formatted(.number.grouping(.never).precision(.fractionLength(0...2)))
-                            afov = preset.apparentFOVDegrees.formatted(.number.grouping(.never).precision(.fractionLength(0...1)))
-                        }
+        AddEquipmentSheet(title: "Add Eyepiece", isValid: valid) {
+            appState.equipment.addEyepiece(Eyepiece(name: name,
+                                          focalLengthMM: Double(focal) ?? 0,
+                                          apparentFOVDegrees: Double(afov) ?? 52))
+        } content: {
+            Section("Start from a preset") {
+                ForEach(EquipmentHelp.eyepiecePresets) { preset in
+                    Button(preset.name) {
+                        name = preset.name
+                        focal = preset.focalLengthMM.formatted(.number.grouping(.never).precision(.fractionLength(0...2)))
+                        afov = preset.apparentFOVDegrees.formatted(.number.grouping(.never).precision(.fractionLength(0...1)))
                     }
                 }
-                Section {
-                    TextField("Name (e.g. 25mm Plössl)", text: $name)
-                } header: { Text("Name") }
-                Section {
-                    TextField("Focal length (mm)", text: $focal).keyboardType(.decimalPad)
-                } footer: { Text(EquipmentHelp.eyepieceFocalLength) }
-                Section {
-                    TextField("Apparent field of view (°)", text: $afov).keyboardType(.decimalPad)
-                } footer: { Text(EquipmentHelp.apparentFOV) }
-                if let previewLine {
-                    Section { Text(previewLine).font(.footnote).foregroundStyle(.secondary) }
-                }
             }
-            .navigationTitle("Add Eyepiece")
-            .navigationBarTitleDisplayMode(.inline)
-            .toolbar {
-                ToolbarItem(placement: .cancellationAction) { Button("Cancel") { dismiss() } }
-                ToolbarItem(placement: .confirmationAction) {
-                    Button("Save") {
-                        appState.equipment.addEyepiece(Eyepiece(name: name,
-                                                      focalLengthMM: Double(focal) ?? 0,
-                                                      apparentFOVDegrees: Double(afov) ?? 52))
-                        dismiss()
-                    }.disabled(!valid)
-                }
+            Section { TextField("Name (e.g. 25mm Plössl)", text: $name) } header: { Text("Name") }
+            Section {
+                TextField("Focal length (mm)", text: $focal).keyboardType(.decimalPad)
+            } footer: { Text(EquipmentHelp.eyepieceFocalLength) }
+            Section {
+                TextField("Apparent field of view (°)", text: $afov).keyboardType(.decimalPad)
+            } footer: { Text(EquipmentHelp.apparentFOV) }
+            if let previewLine {
+                Section { Text(previewLine).font(.footnote).foregroundStyle(.secondary) }
             }
+        }
+    }
+}
+
+// MARK: - Shared sheet scaffold
+
+private struct AddEquipmentSheet<Content: View>: View {
+    let title: String
+    let isValid: Bool
+    let onSave: () -> Void
+    let content: Content
+    @Environment(\.dismiss) private var dismiss
+
+    init(title: String, isValid: Bool, onSave: @escaping () -> Void,
+         @ViewBuilder content: () -> Content) {
+        self.title = title
+        self.isValid = isValid
+        self.onSave = onSave
+        self.content = content()
+    }
+
+    var body: some View {
+        NavigationStack {
+            Form { content }
+                .navigationTitle(title)
+                .navigationBarTitleDisplayMode(.inline)
+                .toolbar {
+                    ToolbarItem(placement: .cancellationAction) {
+                        Button("Cancel") { dismiss() }
+                    }
+                    ToolbarItem(placement: .confirmationAction) {
+                        Button("Save") { onSave(); dismiss() }
+                            .disabled(!isValid)
+                    }
+                }
         }
     }
 }
