@@ -21,6 +21,7 @@ struct TonightView: View {
     @State private var planetInfos: [PlanetInfo] = []
     @State private var telescopeTargets: [TonightTarget] = []
     @State private var telescopeTargetsLoaded = false
+    @State private var sessionLogObjectID: String? = nil
 
     /// Passes ordered either by time (default) or by peak brightness.
     private var sortedPasses: [SatellitePass] {
@@ -35,6 +36,7 @@ struct TonightView: View {
         NavigationStack {
             List {
                 summarySection
+                sessionSection
                 eventsSection
                 sunSection
                 moonSection
@@ -56,6 +58,15 @@ struct TonightView: View {
             .refreshable {
                 await appState.satelliteService.refresh()
                 await reloadPasses()
+            }
+            .sheet(isPresented: Binding(
+                get: { sessionLogObjectID != nil },
+                set: { if !$0 { sessionLogObjectID = nil } }
+            )) {
+                if let id = sessionLogObjectID, let obj = appState.object(withID: id) {
+                    LogObservationSheet(object: obj)
+                        .nightModeAware()
+                }
             }
             .task {
                 if !passesLoaded {
@@ -162,24 +173,64 @@ struct TonightView: View {
         }
     }
 
+    // MARK: Session plan
+
+    @ViewBuilder private var sessionSection: some View {
+        let queueObjects = appState.sessionQueue.compactMap { appState.object(withID: $0) }
+        if !queueObjects.isEmpty {
+            Section {
+                ForEach(queueObjects, id: \.id) { obj in
+                    HStack(spacing: 12) {
+                        ObjectGlyph(object: obj, size: 28).frame(width: 32)
+                        VStack(alignment: .leading, spacing: 2) {
+                            Text(obj.name)
+                            Text(obj.subtitle).font(.caption).foregroundStyle(.secondary)
+                        }
+                        Spacer()
+                        Button {
+                            sessionLogObjectID = obj.id
+                        } label: {
+                            Image(systemName: "checkmark.circle")
+                                .font(.title3)
+                                .foregroundStyle(.indigo)
+                        }
+                        .buttonStyle(.plain)
+                        .accessibilityLabel("Log observation for \(obj.name)")
+                    }
+                }
+                .onDelete { offsets in
+                    offsets.map { queueObjects[$0].id }.forEach { appState.removeFromSessionQueue($0) }
+                }
+            } header: {
+                Text("Tonight's plan")
+            } footer: {
+                Text("Tap ✓ to log an observation and remove it from your plan. Swipe to delete.")
+            }
+        }
+    }
+
     // MARK: Events
 
     @ViewBuilder private var eventsSection: some View {
         if !events.isEmpty {
             Section("Sky events · next 30 days") {
                 ForEach(events.prefix(8)) { event in
-                    HStack(spacing: 12) {
-                        Image(systemName: event.kind.iconSystemName)
-                            .foregroundStyle(.yellow)
-                            .frame(width: 28)
-                        VStack(alignment: .leading, spacing: 2) {
-                            Text(event.title)
-                            Text(event.detail).font(.caption).foregroundStyle(.secondary)
+                    NavigationLink {
+                        EventDetailView(event: event)
+                    } label: {
+                        HStack(spacing: 12) {
+                            Image(systemName: event.kind.iconSystemName)
+                                .foregroundStyle(.yellow)
+                                .frame(width: 28)
+                            VStack(alignment: .leading, spacing: 2) {
+                                Text(event.title)
+                                Text(event.detail).font(.caption).foregroundStyle(.secondary)
+                            }
+                            Spacer()
+                            Text(event.date.formatted(.dateTime.month().day()))
+                                .font(.caption.monospacedDigit())
+                                .foregroundStyle(.secondary)
                         }
-                        Spacer()
-                        Text(event.date.formatted(.dateTime.month().day()))
-                            .font(.caption.monospacedDigit())
-                            .foregroundStyle(.secondary)
                     }
                 }
             }

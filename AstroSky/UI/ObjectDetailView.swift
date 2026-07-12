@@ -67,6 +67,20 @@ struct ObjectDetailView: View {
                         .foregroundStyle(appState.favorites.isFavorite(object.id) ? .yellow : .secondary)
                 }
             }
+            ToolbarItem(placement: .topBarTrailing) {
+                let inQueue = appState.isInSessionQueue(object.id)
+                Button {
+                    if inQueue {
+                        appState.removeFromSessionQueue(object.id)
+                    } else {
+                        appState.addToSessionQueue(object.id)
+                    }
+                } label: {
+                    Image(systemName: inQueue ? "list.bullet.circle.fill" : "list.bullet.circle")
+                        .foregroundStyle(inQueue ? .indigo : .secondary)
+                }
+                .accessibilityLabel(inQueue ? "Remove from tonight's plan" : "Add to tonight's plan")
+            }
             ToolbarItem(placement: .primaryAction) {
                 Button {
                     appState.select(object)
@@ -80,6 +94,7 @@ struct ObjectDetailView: View {
         }
         .sheet(isPresented: $showLogSheet) {
             LogObservationSheet(object: object)
+                .nightModeAware()
         }
         // Recompute position and info rows every ~5 s of sky time.
         .task(id: positionKey) {

@@ -181,6 +181,27 @@ final class AppState {
     var hasAlignmentOffset: Bool { abs(skyAlignmentOffset) > 0.0001 }
     func resetAlignment() { skyAlignmentOffset = 0 }
 
+    /// Set to true to ask SkyRenderer to align the sky so the selected object
+    /// sits exactly where the camera is pointing. Cleared by the renderer.
+    var alignToSelectedRequested = false
+
+    // MARK: Session plan (tonight's observing queue — in-memory, session-scoped)
+
+    /// Ordered list of object IDs the user plans to observe tonight.
+    var sessionQueue: [String] = []
+
+    func addToSessionQueue(_ id: String) {
+        if !sessionQueue.contains(id) { sessionQueue.append(id) }
+    }
+
+    func removeFromSessionQueue(_ id: String) {
+        sessionQueue.removeAll { $0 == id }
+    }
+
+    func isInSessionQueue(_ id: String) -> Bool {
+        sessionQueue.contains(id)
+    }
+
     func select(_ object: (any CelestialObject)?) {
         selectedObjectID = object?.id
     }

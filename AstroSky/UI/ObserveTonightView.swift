@@ -38,6 +38,20 @@ struct ObserveTonightView: View {
                     } label: {
                         targetRow(target)
                     }
+                    .swipeActions(edge: .leading) {
+                        let inQueue = appState.isInSessionQueue(target.object.id)
+                        Button {
+                            if inQueue {
+                                appState.removeFromSessionQueue(target.object.id)
+                            } else {
+                                appState.addToSessionQueue(target.object.id)
+                            }
+                        } label: {
+                            Label(inQueue ? "Remove" : "Plan",
+                                  systemImage: inQueue ? "minus.circle" : "list.bullet.circle")
+                        }
+                        .tint(inQueue ? .orange : .indigo)
+                    }
                 }
             }
         }

@@ -219,5 +219,6 @@ private struct AddEquipmentSheet<Content: View>: View {
                     }
                 }
         }
+        .nightModeAware()
     }
 }

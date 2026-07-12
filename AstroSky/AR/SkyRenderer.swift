@@ -299,6 +299,15 @@ final class SkyRenderer: NSObject {
         currentBaseOrientation = SkySceneBuilder.skyOrientation(julianDate: jd, observer: observer)
         updateSkyOrientation()
 
+        // Align-on-star: when the user taps "Align here" in the object card,
+        // compute the azimuth correction from camera forward vs. object ephemeris.
+        if appState.alignToSelectedRequested {
+            appState.alignToSelectedRequested = false
+            if isARMode, let object = appState.selectedObject {
+                alignToObject(object)
+            }
+        }
+
         // Settings.
         constellationLines.isEnabled = appState.showConstellationLines
         celestialEquator.isEnabled = appState.showCelestialEquator
@@ -786,6 +795,39 @@ final class SkyRenderer: NSObject {
         // Map a full screen-width drag to roughly the horizontal field of view.
         let radiansPerPoint = Float(60 * AstroMath.degToRad) / Float(max(arView.bounds.width, 1))
         appState.skyAlignmentOffset += Float(translation.x) * radiansPerPoint
+    }
+
+    /// Align the sky so `object` appears exactly where the camera is pointing.
+    /// Called when the user taps "Align here" in the object card.
+    /// Uses the same lock semantics as `handleAlignPan`: folds the calibrator
+    /// into the persisted offset then suspends auto-calibration.
+    private func alignToObject(_ object: any CelestialObject) {
+        guard let frame = arView.session.currentFrame else { return }
+
+        // Object's J2000 Cartesian direction (via skyPosition)
+        let pos = object.skyPosition(julianDate: appState.skyJulianDate, observer: appState.observer)
+        let eq  = pos.equatorialJ2000
+        let ra  = Float(eq.raHours * 15 * AstroMath.degToRad)
+        let dec = Float(eq.decDegrees * AstroMath.degToRad)
+        let dJ2000 = SIMD3<Float>(cos(dec) * cos(ra), cos(dec) * sin(ra), sin(dec))
+
+        // Rotate into scene space via the current base orientation (no north correction).
+        // In scene space: East=+X, Up=+Y, North=−Z → azimuth = atan2(x, −z).
+        let dBase = currentBaseOrientation.act(dJ2000)
+        let azBase = atan2(dBase.x, -dBase.z)
+
+        // Camera forward direction in ARKit world space (ARKit camera faces −Z).
+        let col2 = frame.camera.transform.columns.2
+        let camFwd = SIMD3<Float>(-col2.x, -col2.y, -col2.z)
+        let azCamera = atan2(camFwd.x, -camFwd.z)
+
+        // Fold calibrator and lock manual alignment.
+        appState.skyAlignmentOffset += northCalibrator.currentOffset
+        northCalibrator.foldAndZero()
+        isManuallyAligned = true
+
+        // New offset: rotate sky so the object sits at the camera's azimuth.
+        appState.skyAlignmentOffset = azCamera - azBase
     }
 
     @objc private func handlePinch(_ gesture: UIPinchGestureRecognizer) {

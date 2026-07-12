@@ -56,6 +56,7 @@ struct TimeControlBar: View {
         .background(.ultraThinMaterial, in: RoundedRectangle(cornerRadius: 14))
         .sheet(isPresented: $showDatePicker) {
             DatePickerSheet()
+                .nightModeAware()
         }
     }
 

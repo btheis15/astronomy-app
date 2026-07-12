@@ -107,6 +107,11 @@ struct SkyCatalog {
         objectIndex[id]
     }
 
+    /// Find the first object whose name exactly matches (case-insensitive).
+    func object(withName name: String) -> (any CelestialObject)? {
+        allObjects.first { $0.name.caseInsensitiveCompare(name) == .orderedSame }
+    }
+
     /// The brightest stars currently above `altitudeDegrees` (stars are stored
     /// brightest-first). Used for GoTo alignment suggestions and field stars.
     func brightStarsAbove(altitudeDegrees: Double, julianDate jd: Double,

@@ -108,6 +108,7 @@ struct SkyTabView: View {
         .animation(.snappy, value: trackingHint)
         .sheet(isPresented: $showSearch) {
             SearchView()
+                .nightModeAware()
         }
     }
 
@@ -238,6 +239,7 @@ struct SkyTabView: View {
                     .buttonStyle(.plain)
                     .sheet(isPresented: $showCalibrationSheet) {
                         CompassCalibrationSheet()
+                            .nightModeAware()
                     }
             } else {
                 chip

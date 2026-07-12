@@ -165,11 +165,11 @@ Order today: photo → header → RA/Dec → rise/set → chart → physical dat
 
 ## T3 — New enhancements (after T0–T2; pick in this order)
 
-1. **Align-on-star** (spec S3 stretch, now more valuable post-T1.1): with a bright object selected, an "Align here" button on the object card computes δ so the object sits exactly where the user centered it — one tap beats two-finger dragging. Reuses the lock semantics from T1.1.
-2. **Observing session list**: "Add to tonight" on object detail + Tonight's target rows → a checkable queue on the Tonight tab; checking an item off pre-fills a new observation-log entry (object, time, seeing). Pure SwiftUI + existing SwiftData log. This turns the app from lookup into a workflow: plan → find (AR guide) → log.
-3. **"Visible now" filter** in catalog lists (`ObjectListView.swift`): toggle to show only objects above 10° altitude right now, sorted by altitude — the batch position computation from P1.1 already provides the data.
-4. **Event detail pages**: Tonight's event rows are display-only; meteor showers deserve a small detail view (radiant chart via existing AR-radiant data, ZHR, moon interference at peak, "Find radiant in AR"), conjunctions a two-object comparison. `EventsEngine` already computes everything.
-5. **Night-mode audit**: verify every sheet/alert added in the past day (calibration sheet, onboarding alerts, edit-observation sheet, DatePicker sheet from T2.4) respects the red night-vision tint — new surfaces are the classic leak.
+1. ✅ **Align-on-star** — `ObjectCardView` "scope" button sets `AppState.alignToSelectedRequested`; `SkyRenderer.alignToObject` reads camera forward direction from ARKit current frame, computes azimuth delta vs. object ephemeris, folds calibrator, and sets `skyAlignmentOffset`. Needs device check.
+2. ✅ **Observing session list** — `AppState.sessionQueue` (in-memory string IDs); "Add to tonight" toolbar button in `ObjectDetailView`; swipe action in `ObserveTonightView`; `TonightView.sessionSection` shows plan with checkmark-to-log and swipe-to-delete.
+3. ✅ **"Visible now" filter** — `ObjectListView.swift` eye toggle; `Task.detached` batch altitude computation; `ContentUnavailableView` when nothing qualifies.
+4. ✅ **Event detail pages** — `EventDetailView.swift`: meteor showers (ZHR, radiant RA/Dec, altitude at peak, moon illumination, "Find radiant in AR"), conjunctions (body rows, altitudes, "Find in AR"), moon events. Events in `TonightView.eventsSection` are now NavigationLinks.
+5. ✅ **Night-mode audit** — `nightModeAware()` ViewModifier in `RootView.swift`; applied to all night-active sheets: Search, Calibration, ObjectCard detail, LogObservation, EditObservation, DatePicker, AddEquipment.
 6. **App Store readiness** (human steps, tracked in FUTURE_UPDATES.md P5.3): real bundle id, team, version bump, PrivacyInfo verification in the built .app.
 
 ## Suggested session sizing for small models

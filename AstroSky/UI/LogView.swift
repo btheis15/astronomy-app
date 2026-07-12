@@ -87,6 +87,7 @@ struct ObservationLogView: View {
         }
         .sheet(item: $editingEntry) { entry in
             EditObservationSheet(entry: entry)
+                .nightModeAware()
         }
     }
 }

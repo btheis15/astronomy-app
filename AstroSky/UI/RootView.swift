@@ -71,3 +71,22 @@ struct NightModeOverlay: View {
             .accessibilityHidden(true)
     }
 }
+
+// MARK: - Night-mode sheet helper
+
+/// Applies the red tint and overlay to sheets/covers presented at night.
+/// Sheets present above the root overlay, so each one needs its own tint.
+private struct NightModeSheetModifier: ViewModifier {
+    @Environment(AppState.self) private var appState
+    func body(content: Content) -> some View {
+        content
+            .tint(appState.nightMode ? .red : .indigo)
+            .overlay { if appState.nightMode { NightModeOverlay() } }
+    }
+}
+
+extension View {
+    func nightModeAware() -> some View {
+        modifier(NightModeSheetModifier())
+    }
+}
