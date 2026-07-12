@@ -6,6 +6,7 @@
 //  survive across AppState instances and that defaults are sane on first launch.
 //
 
+import Foundation
 import Testing
 @testable import AstroSky
 
