@@ -49,6 +49,9 @@ struct RootView: View {
             }
         }
         .task { showOnboarding = !appState.hasOnboarded }
+        .onChange(of: appState.hasOnboarded) { _, isOnboarded in
+            if !isOnboarded { showOnboarding = true }
+        }
         .fullScreenCover(isPresented: $showOnboarding) {
             OnboardingView { showOnboarding = false }
         }

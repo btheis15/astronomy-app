@@ -770,6 +770,7 @@ extension SkyRenderer: ARSessionDelegate {
             configuration.worldAlignment = .gravity
             configuration.planeDetection = []
             self.arView.session.run(configuration, options: .resetTracking)
+            self.northCalibrator.reset()
         }
     }
 
