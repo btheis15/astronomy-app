@@ -70,6 +70,15 @@ final class NorthCalibrator {
 
     // MARK: Reset
 
+    /// Zeroes currentOffset and targetOffset without touching the circular
+    /// accumulator or re-entering acquiring mode. Used when the caller folds
+    /// the current offset into an external value and wants the calibrator to
+    /// continue tracking from zero.
+    func foldAndZero() {
+        currentOffset = 0
+        targetOffset = 0
+    }
+
     /// Clears all accumulators and re-enters the fast-acquisition regime.
     /// Call whenever the AR session restarts or is interrupted.
     func reset() {

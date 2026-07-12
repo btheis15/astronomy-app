@@ -276,11 +276,13 @@ final class AppState {
     /// Loads the HYG deep-star catalog off the main actor and swaps it in.
     /// No-op when hygdata.csv is not bundled.
     private func upgradeToDeepCatalog() async {
-        let deepStars = await Task.detached(priority: .utility) {
-            HYGCatalogLoader.loadIfAvailable()
-        }.value
-        if let stars = deepStars {
-            catalog = SkyCatalog(deepStars: stars)
+        // Build the full SkyCatalog (merges + sorts 16k stars) inside the
+        // detached task so the main actor is never blocked.
+        let buildTask = Task.detached(priority: .utility) { () -> SkyCatalog? in
+            guard let stars = HYGCatalogLoader.loadIfAvailable() else { return nil }
+            return SkyCatalog(deepStars: stars)
         }
+        guard let newCatalog = await buildTask.value else { return }
+        catalog = newCatalog
     }
 }

@@ -18,7 +18,7 @@ struct TonightView: View {
     @State private var twilight: TwilightTimes? = nil
     @State private var moonPhase: MoonEphemeris.PhaseInfo? = nil
     @State private var moonEvents: RiseSetEvents? = nil
-    @State private var planetInfos: [(planet: PlanetObject, altStr: String, isUp: Bool, magStr: String)] = []
+    @State private var planetInfos: [PlanetInfo] = []
     @State private var telescopeTargets: [TonightTarget] = []
     @State private var telescopeTargetsLoaded = false
 
@@ -95,8 +95,12 @@ struct TonightView: View {
                 planetInfos = appState.catalog.planets.map { planet in
                     let pos = PlanetEphemeris.position(of: planet.planet, julianDate: jd)
                     let h = planet.horizontal(julianDate: jd, observer: obs)
-                    return (planet, AstroFormat.degrees(h.altitude) + " · " + h.compassDirection,
-                            h.isAboveHorizon, AstroFormat.magnitude(pos.magnitude))
+                    return PlanetInfo(
+                        planet: planet,
+                        altStr: AstroFormat.degrees(h.altitude) + " · " + h.compassDirection,
+                        isUp: h.isAboveHorizon,
+                        magStr: AstroFormat.magnitude(pos.magnitude)
+                    )
                 }
             }
         }
@@ -259,7 +263,7 @@ struct TonightView: View {
                 }
             }
         } header: {
-            Text("Best for your telescope")
+            Text(appState.activeOptics != nil ? "Best for your telescope" : "Highlights tonight")
         }
     }
 
@@ -313,7 +317,14 @@ struct TonightView: View {
                 SatelliteGlyph(size: 30)
                     .frame(width: 34)
                 VStack(alignment: .leading, spacing: 2) {
-                    Text(pass.satelliteName).foregroundStyle(.primary)
+                    HStack(spacing: 6) {
+                        Text(pass.satelliteName).foregroundStyle(.primary)
+                        if pass.start > Date() {
+                            Text(pass.start, style: .relative)
+                                .font(.caption.weight(.semibold))
+                                .foregroundStyle(.indigo)
+                        }
+                    }
                     Text("\(AstroFormat.time(pass.start)) → \(AstroFormat.time(pass.end))")
                         .font(.caption)
                         .foregroundStyle(.secondary)
@@ -379,6 +390,15 @@ struct TonightView: View {
         }
         .font(.subheadline)
     }
+}
+
+// MARK: - Supporting types
+
+private struct PlanetInfo {
+    let planet: PlanetObject
+    let altStr: String
+    let isUp: Bool
+    let magStr: String
 }
 
 // MARK: - Moon phase drawing

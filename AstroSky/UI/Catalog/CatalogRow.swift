@@ -10,7 +10,8 @@ struct CatalogRow: View {
     let object: any CelestialObject
     @State private var isAboveHorizon = false
 
-    private var positionKey: Int { Int(appState.skyJulianDate * 17280) }
+    // 17280 = 86400 s/day ÷ 5 s/tick: refreshes every ~5 s of sky time.
+    private var positionKey: Int { Int(appState.skyJulianDate * 17_280) }
 
     var body: some View {
         HStack {

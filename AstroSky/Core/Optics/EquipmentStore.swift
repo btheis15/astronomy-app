@@ -11,7 +11,7 @@ import Foundation
 import Observation
 import OSLog
 
-private let logger = Logger(subsystem: "com.astrosky", category: "ephemeris")
+private let logger = Logger(subsystem: "com.astrosky", category: "persistence")
 
 struct EquipmentLibrary: Codable, Sendable {
     var telescopes: [Telescope]

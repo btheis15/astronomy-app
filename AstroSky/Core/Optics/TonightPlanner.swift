@@ -23,15 +23,17 @@ enum TonightPlanner {
     static func compute(appState: AppState) async -> [TonightTarget] {
         let optics = appState.activeOptics
         let bortle = appState.bortleClass
+        let bortleLimit = appState.bortleLimitingMagnitude
         let observer = appState.observer
         let now = Date()
         let jd = appState.skyJulianDate
 
-        var candidates: [any CelestialObject] = [appState.catalog.sun, appState.catalog.moon]
+        var candidates: [any CelestialObject] = [appState.catalog.moon]
         candidates.append(contentsOf: appState.catalog.planets.map { $0 as any CelestialObject })
         candidates.append(contentsOf: appState.catalog.minorBodies.map { $0 as any CelestialObject })
-        candidates.append(contentsOf: appState.catalog.deepSky.map { $0 as any CelestialObject })
-        candidates.removeAll { $0.kind == .sun }
+        if optics != nil {
+            candidates.append(contentsOf: appState.catalog.deepSky.map { $0 as any CelestialObject })
+        }
         var seenNames = Set<String>()
         candidates = candidates.filter { seenNames.insert($0.name.lowercased()).inserted }
 
@@ -49,7 +51,17 @@ enum TonightPlanner {
                                                          angularSizeRadians: size,
                                                          bortleClass: bortle).verdict
                 } else {
-                    verdict = .visible
+                    // No telescope — only include solar system objects and
+                    // naked-eye stars (magnitude within the Bortle sky limit).
+                    switch object.kind {
+                    case .planet, .moon, .minorBody:
+                        verdict = .visible
+                    case .star:
+                        guard (object.magnitude ?? 99) <= bortleLimit else { continue }
+                        verdict = .visible
+                    default:
+                        continue
+                    }
                 }
                 guard verdict != .notVisible else { continue }
                 result.append(TonightTarget(object: object, verdict: verdict,

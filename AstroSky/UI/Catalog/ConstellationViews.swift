@@ -23,7 +23,7 @@ private struct ConstellationRow: View {
     let constellation: Constellation
     @State private var isAboveHorizon = false
 
-    private var positionKey: Int { Int(appState.skyJulianDate * 17280) }
+    private var positionKey: Int { Int(appState.skyJulianDate * 17_280) }
 
     var body: some View {
         HStack {
@@ -63,7 +63,7 @@ struct ConstellationDetailView: View {
     @State private var altStr = "—"
     @State private var compassStr = "—"
 
-    private var positionKey: Int { Int(appState.skyJulianDate * 17280) }
+    private var positionKey: Int { Int(appState.skyJulianDate * 17_280) }
 
     /// Unique member stars of the stick figure, brightest first.
     private var memberStars: [Star] {

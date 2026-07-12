@@ -21,6 +21,22 @@ struct TelescopeSection: View {
     /// Eyepiece currently driving the preview — the user's tapped choice, else
     /// the active eyepiece, else the first one.
     @State private var selectedEyepieceID: UUID?
+    /// Pre-computed expensive results; nil while the initial computation is running.
+    @State private var sectionData: SectionData?
+
+    // MARK: - Memoized data
+
+    private struct SectionData: Sendable {
+        struct EyepieceRow: Identifiable, Sendable {
+            var id: UUID { eyepieceID }
+            let eyepieceID: UUID
+            let eyepieceName: String
+            let optics: OpticsResult
+            let assessment: VisibilityAssessment
+        }
+        let eyepieceRows: [EyepieceRow]
+        let placement: TonightPlacement
+    }
 
     private var resolvedEyepiece: Eyepiece? {
         let eyepieces = appState.equipment.eyepieces
@@ -28,31 +44,81 @@ struct TelescopeSection: View {
         return appState.equipment.activeEyepiece ?? eyepieces.first
     }
 
+    /// Key for .task(id:). Excludes the selected eyepiece — every eyepiece row
+    /// is pre-computed, so switching the picker is a free lookup, not a re-run.
+    private var computeKey: String {
+        let scopeID = appState.equipment.activeTelescope?.id.uuidString ?? "none"
+        let allEPs = appState.equipment.eyepieces.map { $0.id.uuidString }.joined(separator: ",")
+        let bortle = appState.bortleClass
+        let lat = String(format: "%.2f", appState.observer.latitudeDegrees)
+        return "\(object.id)|\(scopeID)|\(allEPs)|\(bortle)|\(lat)"
+    }
+
+    // MARK: - Body
+
     var body: some View {
-        if let scope = appState.equipment.activeTelescope, let eyepiece = resolvedEyepiece {
-            let optics = TelescopeMath.result(scope: scope, eyepiece: eyepiece, bortleClass: appState.bortleClass)
-            previewSection(optics: optics, eyepiece: eyepiece)
-            eyepieceTable(scope: scope)
-            tonightSection
-            tipsSection(optics: optics)
-            mountSection
-        } else {
-            Section("Telescope") {
-                Text("Add your telescope and eyepieces to see what this looks like through the eyepiece, how hard it is, and how to find it.")
-                    .font(.subheadline).foregroundStyle(.secondary)
-                NavigationLink {
-                    EquipmentEditorView()
-                } label: {
-                    Label("Set up my telescope", systemImage: "eyeglasses")
+        Group {
+            if appState.equipment.activeTelescope != nil, let eyepiece = resolvedEyepiece {
+                if let data = sectionData,
+                   let activeRow = data.eyepieceRows.first(where: { $0.eyepieceID == eyepiece.id }) {
+                    previewSection(optics: activeRow.optics, eyepiece: eyepiece,
+                                   assessment: activeRow.assessment)
+                    eyepieceTable(rows: data.eyepieceRows)
+                    tonightSection(placement: data.placement)
+                    tipsSection(optics: activeRow.optics)
+                    mountSection
+                } else {
+                    Section("Telescope") {
+                        HStack(spacing: 12) {
+                            ProgressView()
+                            Text("Computing…").foregroundStyle(.secondary)
+                        }
+                    }
+                }
+            } else {
+                Section("Telescope") {
+                    Text("Add your telescope and eyepieces to see what this looks like through the eyepiece, how hard it is, and how to find it.")
+                        .font(.subheadline).foregroundStyle(.secondary)
+                    NavigationLink {
+                        EquipmentEditorView()
+                    } label: {
+                        Label("Set up my telescope", systemImage: "eyeglasses")
+                    }
                 }
             }
         }
+        .task(id: computeKey) {
+            guard let scope = appState.equipment.activeTelescope else {
+                sectionData = nil
+                return
+            }
+            let obj = object
+            let eyepieces = appState.equipment.eyepieces
+            let bortle = appState.bortleClass
+            let angSz = angularSize
+            let observer = appState.observer
+
+            sectionData = await Task.detached(priority: .userInitiated) {
+                let rows = eyepieces.map { ep -> SectionData.EyepieceRow in
+                    let optics = TelescopeMath.result(scope: scope, eyepiece: ep, bortleClass: bortle)
+                    let assessment = TelescopeVisibility.assess(object: obj, optics: optics,
+                                                                angularSizeRadians: angSz,
+                                                                bortleClass: bortle)
+                    return SectionData.EyepieceRow(eyepieceID: ep.id, eyepieceName: ep.name,
+                                                   optics: optics, assessment: assessment)
+                }
+                let placement = TonightPlacementCalculator.compute(object: obj, observer: observer,
+                                                                    date: Date())
+                return SectionData(eyepieceRows: rows, placement: placement)
+            }.value
+        }
     }
 
+    // MARK: - Preview section
+
     @ViewBuilder
-    private func previewSection(optics: OpticsResult, eyepiece: Eyepiece) -> some View {
-        let assessment = TelescopeVisibility.assess(object: object, optics: optics,
-                                                    angularSizeRadians: angularSize, bortleClass: appState.bortleClass)
+    private func previewSection(optics: OpticsResult, eyepiece: Eyepiece,
+                                 assessment: VisibilityAssessment) -> some View {
         let telePhoto = ObjectImagery.telescopePhoto(for: object)
         let wideMatch = telePhoto?.caption == "Telescope view"
         Section {
@@ -149,46 +215,46 @@ struct TelescopeSection: View {
         }
     }
 
-    private func eyepieceTable(scope: Telescope) -> some View {
+    // MARK: - Eyepiece comparison table
+
+    private func eyepieceTable(rows: [SectionData.EyepieceRow]) -> some View {
         Section {
-            ForEach(appState.equipment.eyepieces) { eyepiece in
-                let optics = TelescopeMath.result(scope: scope, eyepiece: eyepiece, bortleClass: appState.bortleClass)
-                let assessment = TelescopeVisibility.assess(object: object, optics: optics,
-                                                            angularSizeRadians: angularSize, bortleClass: appState.bortleClass)
-                let isSelected = eyepiece.id == resolvedEyepiece?.id
+            ForEach(rows) { row in
+                let isSelected = row.eyepieceID == resolvedEyepiece?.id
                 Button {
-                    selectedEyepieceID = eyepiece.id
+                    selectedEyepieceID = row.eyepieceID
                 } label: {
                     HStack {
                         VStack(alignment: .leading, spacing: 2) {
-                            Text(eyepiece.name).foregroundStyle(.primary)
-                            Text("\(Int(optics.magnification))× · \(optics.trueFOVDegrees, specifier: "%.2f")° field")
+                            Text(row.eyepieceName).foregroundStyle(.primary)
+                            Text("\(Int(row.optics.magnification))× · \(row.optics.trueFOVDegrees, specifier: "%.2f")° field")
                                 .font(.caption).foregroundStyle(.secondary)
                         }
                         Spacer()
                         if isSelected {
                             Image(systemName: "checkmark.circle.fill").foregroundStyle(.indigo)
                         }
-                        Image(systemName: assessment.verdict.systemImage)
-                            .foregroundStyle(color(for: assessment.verdict))
+                        Image(systemName: row.assessment.verdict.systemImage)
+                            .foregroundStyle(color(for: row.assessment.verdict))
                     }
                 }
                 .buttonStyle(.plain)
             }
-            if appState.equipment.eyepieces.isEmpty {
+            if rows.isEmpty {
                 Text("Add an eyepiece to compare magnifications.").font(.caption).foregroundStyle(.secondary)
             }
         } header: {
             Text("With each of your eyepieces")
         } footer: {
-            if !appState.equipment.eyepieces.isEmpty {
+            if !rows.isEmpty {
                 Text("Tap an eyepiece to preview it above.")
             }
         }
     }
 
-    @ViewBuilder private var tonightSection: some View {
-        let placement = TonightPlacementCalculator.compute(object: object, observer: appState.observer, date: Date())
+    // MARK: - Tonight section
+
+    @ViewBuilder private func tonightSection(placement: TonightPlacement) -> some View {
         if let best = placement.bestTime, placement.maxAltitudeDegrees > 0 {
             Section("Tonight") {
                 LabeledContent("Best around", value: best.formatted(date: .omitted, time: .shortened))
@@ -204,6 +270,8 @@ struct TelescopeSection: View {
             }
         }
     }
+
+    // MARK: - Tips & mount sections
 
     private func tipsSection(optics: OpticsResult) -> some View {
         let tips = ObservingTips.tips(for: object, optics: optics)

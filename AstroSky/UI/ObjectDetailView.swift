@@ -27,8 +27,9 @@ struct ObjectDetailView: View {
     /// Cached info rows — recomputed only every ~5 s of real time.
     @State private var cachedInfoRows: [(label: String, value: String)] = []
 
-    /// Changes roughly every 5 s of simulated sky time (17280 ticks per day).
-    private var positionKey: Int { Int(appState.skyJulianDate * 17280) }
+    /// 17280 = 86400 s/day ÷ 5 s/tick: changes roughly every 5 s of sky time.
+    private static let jdTicksPerDay: Double = 17_280
+    private var positionKey: Int { Int(appState.skyJulianDate * Self.jdTicksPerDay) }
 
     /// Changes when the calendar day (or observer location) changes.
     private var dayKey: String {
